@@ -1,18 +1,14 @@
 """
-model.py for Grammarly CoEdit large model.
+Grammarly CoEdit Grammar Correction model using "grammarly/coedit-large"
+with the Python backend for Triton.
 
-This module uses the Python backend for Triton to load a T5 model from Hugging Face,
-preprocess input, run inference, and return the corrected sentences.
-
-Best Practices:
-1. Validate model architecture matches the config.pbtxt dimensions.
-2. Thoroughly handle input and output shapes, raising clear errors on mismatches.
-3. Add logging for debug and trace in production scenarios.
+This script loads a T5 model via the Transformers library and uses it
+to correct grammar for the provided input text.
 """
 
 import triton_python_backend_utils as pb_utils
-import torch
 import numpy as np
+import torch
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 import logging
 
@@ -23,61 +19,65 @@ logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(levelname)s - %(name)s: %(message)s'
 )
-logger = logging.getLogger("CoEditlargeModel")
+logger = logging.getLogger("CoEditModel")
 
 
 class TritonPythonModel:
     def initialize(self, args):
         """
-        Load Grammarly CoEdit large model and tokenizer.
+        Load the Grammarly CoEdit model and tokenizer.
         """
-        self.model_name = "grammarly/coedit-large"
+        logger.info("Initializing Grammarly CoEdit model...")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Using model: {self.model_name} on device: {self.device}")
-
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.model = T5ForConditionalGeneration.from_pretrained(self.model_name).to(self.device)
-
-    def correct_grammar(self, input_text):
-        """
-        Runs input text through the Grammarly CoEdit large model to generate corrections.
-
-        :param input_text: str or bytes or np.ndarray representing the text to correct.
-        :return: List of corrected strings (usually just one).
-        """
-        logger.debug(f"Original input_text: {input_text}")
-
-        if isinstance(input_text, bytes):
-            input_text = input_text.decode("utf-8")
-        elif isinstance(input_text, np.ndarray):
-            input_text = input_text.tolist()
-        if isinstance(input_text, list) and len(input_text) == 1:
-            input_text = input_text[0]
-        if not isinstance(input_text, str):
-            raise ValueError(f"Input must be a single string. Got: {type(input_text)} => {input_text}")
-
-        # Tokenize the input string
-        input_ids = self.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
-
-        # Generate corrected text
-        outputs = self.model.generate(input_ids, max_length=256)
-        corrected_texts = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        logger.info(f"Corrected text: {corrected_texts}")
-        return [corrected_texts]
+        self.tokenizer = AutoTokenizer.from_pretrained("grammarly/coedit-large")
+        self.model = T5ForConditionalGeneration.from_pretrained("grammarly/coedit-large").to(self.device)
+        logger.info("Grammarly CoEdit model loaded successfully.")
 
     def execute(self, requests):
         """
-        Main execution method for Triton inference requests.
+        Process incoming requests from Triton. The user text is expected
+        to be provided as a 1D or 2D tensor named "INPUT".
         """
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT")
-            if input_tensor is None:
-                raise ValueError("Input tensor 'INPUT' is missing.")
+            if not input_tensor:
+                raise ValueError("Input tensor 'INPUT' is missing for CoEdit model.")
 
-            input_text = input_tensor.as_numpy()[0].decode("utf-8")
-            corrected_texts = self.correct_grammar(input_text)
-            output_tensor = pb_utils.Tensor("OUTPUT", np.array(corrected_texts, dtype=object))
+            # Convert to numpy array
+            input_array = input_tensor.as_numpy()
+            logger.debug(f"Received input array of shape {input_array.shape}")
+
+            # Handle 1D ([1]) or 2D ([batch, 1]) shapes
+            if len(input_array.shape) == 1:
+                text_to_correct = input_array[0]
+            elif len(input_array.shape) == 2:
+                text_to_correct = input_array[0, 0]
+            else:
+                raise ValueError(f"Unexpected shape {input_array.shape}. Expected 1D or 2D.")
+
+            # Decode bytes if needed
+            if isinstance(text_to_correct, bytes):
+                text_to_correct = text_to_correct.decode("utf-8")
+
+            logger.info(f"Text to correct (CoEdit): {text_to_correct}")
+
+            # Tokenize the input
+            input_ids = self.tokenizer(
+                text_to_correct,
+                return_tensors="pt",
+                padding="max_length",
+                truncation=True,
+                max_length=128
+            ).input_ids.to(self.device)
+
+            # Generate the corrected output
+            outputs = self.model.generate(input_ids, max_length=256, num_beams=5, num_return_sequences=1)
+            corrected_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            logger.info(f"Corrected text: {corrected_text}")
+
+            # Create Triton output tensor
+            output_tensor = pb_utils.Tensor("OUTPUT", np.array([corrected_text], dtype=object))
             responses.append(pb_utils.InferenceResponse([output_tensor]))
 
         return responses

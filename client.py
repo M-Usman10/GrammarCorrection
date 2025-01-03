@@ -1,6 +1,6 @@
 """
 This is a sample client script demonstrating how to interact with multiple Triton
-models (OpenAI, Llama, a T5 grammar corrector, Happy Transformer, and potentially more).
+models (OpenAI, Llama, a T5 grammar corrector, Happy Transformer, and Grammarly CoEdit).
 It uses the Triton HTTP client to send inference requests and prints the responses.
 
 Best Practices and Recommendations:
@@ -29,7 +29,7 @@ logger = logging.getLogger("TritonClient")
 # Connect to Triton Server
 # ------------------------------------------------------------------------------
 TRITON_SERVER_URL = "localhost:8000"
-client = InferenceServerClient(url=TRITON_SERVER_URL)
+client = InferenceServerClient(url=TRITON_SERVER_URL,network_timeout=1000)
 logger.info(f"Connected to Triton server at {TRITON_SERVER_URL}")
 
 # ------------------------------------------------------------------------------
@@ -107,5 +107,24 @@ happy_result = response_happy.as_numpy("OUTPUT")
 logger.info(f"Model Response Happy Transformer: {happy_result}")
 
 print("Model Response Happy Transformer:", happy_result)
+
+# ------------------------------------------------------------------------------
+# Now call the Grammarly CoEdit model
+# ------------------------------------------------------------------------------
+coedit_input_text = "When I grow up, I start to understand what he said is quite right."
+logger.info(f"Input text for CoEdit model: {coedit_input_text}")
+
+# Create input tensor for CoEdit model
+inputs_coedit = [InferInput("INPUT", [1, 1], "BYTES")]  # Match config for CoEdit model
+inputs_coedit[0].set_data_from_numpy(np.array([[coedit_input_text]], dtype=object))
+logger.debug(f"CoEdit input tensor shape: {inputs_coedit[0].shape()}")
+
+# Send inference request to CoEdit model
+response_coedit = client.infer("grammarly-coedit-large", inputs_coedit)
+logger.info("Inference request sent to Grammarly CoEdit model.")
+coedit_result = response_coedit.as_numpy("OUTPUT")
+logger.info(f"Model Response Grammarly CoEdit: {coedit_result}")
+
+print("Model Response Grammarly CoEdit:", coedit_result)
 
 logger.info("All inferences completed successfully.")
