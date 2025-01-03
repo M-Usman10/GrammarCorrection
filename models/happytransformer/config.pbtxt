@@ -1,0 +1,21 @@
+name: "happytransformer"
+backend: "python"
+
+# Allow batching if desired
+max_batch_size: 8
+
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]  # This means (batch, 1) with batch dimension prepended by Triton
+  }
+]
+
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
