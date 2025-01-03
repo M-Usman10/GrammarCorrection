@@ -6,10 +6,10 @@ import numpy as np
 class TritonPythonModel:
     def initialize(self, args):
         """
-        Initialize the AI Suite client and configure the OpenAI model.
+        Initialize the AI Suite client and model configuration.
         """
         self.client = ai.Client()
-        self.models = ["openai:gpt-4o"]
+        self.models = ["ollama:llama3.2:1b"]
 
     def execute(self, requests):
         """
@@ -37,13 +37,13 @@ class TritonPythonModel:
             if isinstance(user_command, bytes):
                 user_command = user_command.decode("utf-8")
 
-            # Construct messages for the OpenAI model
+            # Construct messages for the AI model
             messages = [
                 {"role": "system", "content": "You are a helpful AI assistant."},
                 {"role": "user", "content": user_command},
             ]
 
-            # Send the request to the OpenAI model
+            # Send the request to the AI Suite client
             for model in self.models:
                 response = self.client.chat.completions.create(
                     model=model,

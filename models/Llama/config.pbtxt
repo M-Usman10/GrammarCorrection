@@ -1,13 +1,13 @@
-name: "openai"
+name: "Llama"
 backend: "python"
 
-max_batch_size: 8  # Allow batching up to 8 commands
+max_batch_size: 8  # Supports up to 8 simultaneous commands
 
 input [
   {
     name: "INPUT"
     data_type: TYPE_STRING
-    dims: [ -1 ]  # Supports batch dimension with variable-length input
+    dims: [ -1 ]  # Supports batch dimension and variable-length input
   }
 ]
 
