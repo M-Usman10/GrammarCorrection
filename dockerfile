@@ -1,11 +1,6 @@
 # This Dockerfile builds a custom Triton server image with pre-installed
-# dependencies and a pre-downloaded T5 model for grammar correction,
-# as well as GECToR and HappyTransformer models.
-#
-# Best Practices:
-# 1. Use multi-stage builds to reduce final image size.
-# 2. Keep instructions in a logical order for minimal rebuild steps.
-# 3. Use stable base images for reproducibility.
+# dependencies and pre-downloaded models for grammar correction, including:
+# Grammarly CoEdit, deep-learning-analytics T5 model, and HappyTransformer.
 
 # Use the NVIDIA Triton server base image
 FROM nvcr.io/nvidia/tritonserver:23.10-py3
@@ -31,13 +26,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
-# Upgrade pip and install compatible setuptools and wheel
+# Upgrade pip and install Python dependencies
 # ---------------------------------------------------------------------------
 RUN pip install --upgrade pip setuptools wheel
-
-# ---------------------------------------------------------------------------
-# Install Python packages (excluding Spacy and GECToR dependencies)
-# ---------------------------------------------------------------------------
 RUN pip install --no-cache-dir \
     numpy \
     scikit-learn \
@@ -52,28 +43,47 @@ RUN pip install --no-cache-dir \
     happytransformer
 
 # ---------------------------------------------------------------------------
-# Pre-download the T5 and HappyTransformer models
+# Pre-download models
 # ---------------------------------------------------------------------------
-RUN python3 -c "\
-import torch;\
-import transformers;\
-from transformers import T5Tokenizer, T5ForConditionalGeneration;\
-from happytransformer import HappyTextToText, TTSettings;\
-import os;\
-\
-print('Pre-downloading deep-learning-analytics T5 model...');\
-t5_tokenizer = T5Tokenizer.from_pretrained('${MODEL_NAME}');\
-t5_model = T5ForConditionalGeneration.from_pretrained('${MODEL_NAME}');\
-\
-print('Pre-downloading HappyTransformer model...');\
-happy_tt = HappyTextToText('T5', '${HAPPYTRANSFORMER_MODEL_ID}');\
-settings = TTSettings(num_beams=5, min_length=1);\
-_ = happy_tt.generate_text('grammar: Test sentence', args=settings);\
-\
-print('Pre-download completed successfully.')"
+RUN python3 <<EOF
+import torch
+from transformers import AutoTokenizer, T5ForConditionalGeneration, T5Tokenizer
+from happytransformer import HappyTextToText, TTSettings
+import time
+
+def download_model(model_name):
+    """Download model with retries for robustness."""
+    for attempt in range(3):
+        try:
+            print(f"Attempt {attempt + 1}: Downloading {model_name}...")
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = T5ForConditionalGeneration.from_pretrained(model_name)
+            print(f"{model_name} downloaded successfully.")
+            return
+        except Exception as e:
+            print(f"Error downloading {model_name}: {e}")
+            time.sleep(10)
+    raise RuntimeError(f"Failed to download {model_name} after multiple attempts.")
+
+# Download Grammarly CoEdit large model
+download_model("grammarly/coedit-large")
+
+# Pre-download deep-learning-analytics T5 model
+print('Pre-downloading deep-learning-analytics T5 model...')
+t5_tokenizer = T5Tokenizer.from_pretrained('${MODEL_NAME}')
+t5_model = T5ForConditionalGeneration.from_pretrained('${MODEL_NAME}')
+
+# Pre-download HappyTransformer model
+print('Pre-downloading HappyTransformer model...')
+happy_tt = HappyTextToText('T5', '${HAPPYTRANSFORMER_MODEL_ID}')
+settings = TTSettings(num_beams=5, min_length=1)
+_ = happy_tt.generate_text('grammar: Test sentence', args=settings)
+
+print('Pre-download completed successfully.')
+EOF
 
 # ---------------------------------------------------------------------------
-# Ensure the model and dependencies are available when the container starts
+# Create Hugging Face cache directory
 # ---------------------------------------------------------------------------
 RUN mkdir -p /huggingface && chmod -R 777 /huggingface
 

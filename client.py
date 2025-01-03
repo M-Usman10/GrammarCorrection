@@ -85,9 +85,9 @@ logger.debug(f"Grammar correction input tensor shape: {inputs_grammar[0].shape()
 response_grammar = client.infer("deep-learning-analytics-Grammar-Correction-T5", inputs_grammar)
 logger.info("Inference request sent to Grammar Correction model.")
 grammar_result = response_grammar.as_numpy("OUTPUT")
-logger.info(f"Model Response Grammar Correction: {grammar_result}")
+logger.info(f"Model Response T5 Grammar Correction: {grammar_result}")
 
-print("Model Response Grammar Correction:", grammar_result)
+print("Model Response Grammar T5 Correction:", grammar_result)
 
 # ------------------------------------------------------------------------------
 # Now call the Happy Transformer model
