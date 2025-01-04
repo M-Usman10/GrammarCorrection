@@ -1,6 +1,5 @@
 # This Dockerfile builds a custom Triton server image with pre-installed
-# dependencies and pre-downloaded models for grammar correction, including:
-# Grammarly CoEdit, deep-learning-analytics T5 model, and HappyTransformer.
+# dependencies and pre-downloaded models for grammar correction and Whisper.
 
 # Use the NVIDIA Triton server base image
 FROM nvcr.io/nvidia/tritonserver:23.10-py3
@@ -23,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     libffi-dev \
     libssl-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
@@ -40,14 +40,15 @@ RUN pip install --no-cache-dir \
     aisuite \
     openai \
     accelerate \
-    happytransformer
+    happytransformer \
+    librosa
 
 # ---------------------------------------------------------------------------
 # Pre-download models
 # ---------------------------------------------------------------------------
 RUN python3 <<EOF
 import torch
-from transformers import AutoTokenizer, T5ForConditionalGeneration, T5Tokenizer
+from transformers import AutoTokenizer, T5ForConditionalGeneration, T5Tokenizer, pipeline
 from happytransformer import HappyTextToText, TTSettings
 import time
 
@@ -79,6 +80,9 @@ happy_tt = HappyTextToText('T5', '${HAPPYTRANSFORMER_MODEL_ID}')
 settings = TTSettings(num_beams=5, min_length=1)
 _ = happy_tt.generate_text('grammar: Test sentence', args=settings)
 
+# Pre-download Whisper model
+print('Pre-downloading Whisper model...')
+transcription_pipeline = pipeline("automatic-speech-recognition", model="openai/whisper-small")
 print('Pre-download completed successfully.')
 EOF
 
