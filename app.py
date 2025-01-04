@@ -8,6 +8,7 @@ import numpy as np
 import librosa
 from flask import Flask, render_template, request, jsonify
 from tritonclient.http import InferenceServerClient, InferInput
+from TTS.api import TTS  # Directly use TTS here
 
 from utils import (
     list_models,
@@ -125,16 +126,20 @@ def tts_endpoint():
     if not text:
         return jsonify({'error': 'No text provided.'}), 400
     try:
-        client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=1000)
-        inputs = [InferInput("INPUT", [1, 1], "BYTES")]
-        inputs[0].set_data_from_numpy(np.array([[text]], dtype=object))
-        response = client.infer("tts", inputs)
-        audio_data = response.as_numpy("OUTPUT")
-        if audio_data is not None and audio_data.size > 0:
-            raw_audio = audio_data.tobytes()
-            base64_audio = base64.b64encode(raw_audio).decode('utf-8')
-            return jsonify({'audio': base64_audio})
-        return jsonify({'error': 'No audio data returned.'}), 400
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        # Directly use TTS (without Triton model)
+        local_tts = TTS(model_name="tts_models/en/vctk/vits")
+        local_tts.tts_to_file(text=text, file_path=tmp_path, speaker="p229")
+
+        with open(tmp_path, 'rb') as f:
+            raw_audio = f.read()
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+        base64_audio = base64.b64encode(raw_audio).decode('utf-8')
+        return jsonify({'audio': base64_audio})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
