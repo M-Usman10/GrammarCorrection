@@ -1,9 +1,11 @@
 # app.py
 import os
-from flask import Flask, render_template, request, jsonify
+import io
 import numpy as np
+from flask import Flask, render_template, request, jsonify
 from tritonclient.http import InferenceServerClient, InferInput
 
+import librosa  # For audio loading/resampling
 from utils import (
     list_models,
     create_model,
@@ -35,6 +37,29 @@ def infer_model(model_name, input_text):
 
     response = client.infer(model_name, inputs)
     return response.as_numpy("OUTPUT")
+import soundfile as sf
+
+def transcribe_whisper(audio_bytes):
+    """
+    Send audio to Whisper model on Triton for transcription.
+    Expects 16 kHz float32 audio.
+    """
+    client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=500)
+
+    # We will load audio from the bytes, re-sample to 16k, convert to float32
+    audio_data, sample_rate = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)
+    audio_data = audio_data.astype(np.float32)
+    sf.write("test.wav", audio_data, samplerate=16000)
+    inputs = [InferInput("AUDIO_INPUT", [len(audio_data)], "FP32")]
+    inputs[0].set_data_from_numpy(audio_data)
+
+    response = client.infer("whisper", inputs)
+    transcription = response.as_numpy("OUTPUT")
+    # Usually transcription is a single string
+    if transcription is not None and transcription.size > 0:
+        print("Transcription",transcription[0].decode("utf-8"))
+        return transcription[0].decode("utf-8")
+    return ""
 
 @app.route('/')
 def index():
@@ -54,7 +79,7 @@ def api_list_models():
 @app.route('/api/query', methods=['POST'])
 def query_model():
     """
-    Inference endpoint
+    Inference endpoint (text-based).
     """
     model_name = request.form.get('model', '').strip()
     input_text = request.form.get('query', '')
@@ -67,6 +92,38 @@ def query_model():
         return jsonify({'response': decoded})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+@app.route('/api/transcribe_and_infer', methods=['POST'])
+def transcribe_and_infer():
+    """
+    1) Receive WAV from user.
+    2) Use Whisper model to convert audio -> text.
+    3) Use selected model to get final inference from text.
+    """
+    model_name = request.form.get('model', '').strip()
+    file = request.files.get('audio_data')
+    if not file:
+        return jsonify({'error': 'No audio file received.'}), 400
+
+    try:
+        # Step 1: Transcribe with Whisper
+        audio_bytes = file.read()
+        transcription_text = transcribe_whisper(audio_bytes)
+
+        # Step 2: If user provided a model name, do the inference
+        if model_name:
+            output = infer_model(model_name, transcription_text)
+            if output.size > 0:
+                final_text = output[0].decode('utf-8')
+            else:
+                final_text = ""
+            return jsonify({'response': final_text})
+        else:
+            # If no model name, just return the transcription
+            return jsonify({'response': transcription_text})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/add_model', methods=['POST'])
 def api_add_model():
@@ -169,4 +226,4 @@ def api_get_server_logs():
     return jsonify({'logs': logs})
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0",port=5000,debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

@@ -1,14 +1,21 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>LLM Playground (Single Page)</title>
+
+  <!-- Bootstrap CSS -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     rel="stylesheet"
   />
+  <!-- Bootstrap Icons (for mic, check, and x icons) -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
+  />
+
   <style>
     body {
       background-color: #fafafa;
@@ -50,6 +57,22 @@
       font-family: monospace;
       white-space: pre;
     }
+    /* A subtle highlight for the microphone button to match the gradient */
+    .mic-btn {
+      background-image: linear-gradient(to right, #4285f4, #ea4335, #fbbc05, #34a853);
+      color: #fff;
+      border: none;
+    }
+    .mic-btn i {
+      font-size: 1.2rem;
+    }
+    .recording-indicator {
+      font-weight: bold;
+      color: #d9534f; /* red-ish */
+    }
+    .hidden {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -85,6 +108,8 @@
                 <h5 class="mb-0">Triton Model Inference</h5>
               </div>
               <div class="card-body">
+
+                <!-- Mic + Normal Query Container -->
                 <form id="model-form">
                   <div class="mb-3">
                     <label for="model" class="form-label">Select Model</label>
@@ -92,12 +117,32 @@
                       <option value="" disabled selected>Loading models...</option>
                     </select>
                   </div>
-                  <div class="mb-3">
+                  <div class="mb-3" id="textQueryContainer">
                     <label for="query" class="form-label">Enter Query</label>
                     <textarea class="form-control" id="query" name="query" rows="3" required></textarea>
                   </div>
-                  <button type="submit" class="btn btn-primary w-100">Submit</button>
+                  <button type="submit" class="btn btn-primary w-100" id="submitQueryBtn">Submit</button>
                 </form>
+
+                <!-- Microphone Record Button -->
+                <div class="text-center mt-3">
+                  <button id="startRecordingBtn" class="btn mic-btn">
+                    <i class="bi bi-mic"></i> Record
+                  </button>
+                </div>
+
+                <!-- Recording UI (hidden initially) -->
+                <div id="recordingUI" class="mt-4 hidden text-center">
+                  <p class="recording-indicator">Recording...</p>
+                  <div class="d-flex justify-content-center gap-3">
+                    <button id="cancelRecordingBtn" class="btn btn-secondary">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                    <button id="confirmRecordingBtn" class="btn btn-success">
+                      <i class="bi bi-check-lg"></i>
+                    </button>
+                  </div>
+                </div>
 
                 <!-- Loader -->
                 <div id="loader" class="mt-3 text-center" style="display:none;">
@@ -116,7 +161,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </div> <!-- end HOME TAB -->
 
       <!-- MANAGE MODELS TAB -->
       <div class="tab-pane fade" id="manageModels" role="tabpanel" aria-labelledby="manage-tab">
@@ -136,7 +181,7 @@
                     <form id="add-model-form">
                       <div class="mb-3">
                         <label for="new_model_name" class="form-label">New Model Name</label>
-                        <input type="text" class="form-control" id="new_model_name" name="new_model_name" required>
+                        <input type="text" class="form-control" id="new_model_name" name="new_model_name" required />
                       </div>
                       <button type="submit" class="btn btn-primary w-100">Create Model</button>
                     </form>
@@ -192,7 +237,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </div> <!-- end MANAGE MODELS TAB -->
 
       <!-- SERVER CONTROL TAB -->
       <div class="tab-pane fade" id="serverControl" role="tabpanel" aria-labelledby="server-tab">
@@ -219,7 +264,6 @@
           </div>
         </div>
       </div> <!-- /serverControl tab -->
-
     </div> <!-- /tab-content -->
   </div> <!-- /container -->
 
@@ -228,8 +272,12 @@
     <small>&copy; 2025 - LLM Playground (Single Page)</small>
   </footer>
 
+  <!-- JS: jQuery + Bootstrap Bundle + Our scripts -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
+  </script>
+
   <script>
     /********************************************************
      *  Load Models into <select> helper
@@ -248,6 +296,80 @@
     }
 
     /********************************************************
+     *  Global Variables for Audio Recording
+     ********************************************************/
+    let mediaRecorder;
+    let audioChunks = [];
+
+    /********************************************************
+     *  Helper: Convert raw recorded chunks to a WAV Blob
+     *  This is a minimal approach to create a WAV header
+     *  and append raw PCM from recorded data. For production,
+     *  you might use a more robust library.
+     ********************************************************/
+    function encodeWAV(audioBuffer, sampleRate = 48000) {
+      // For simplicity, assume 16-bit PCM, 1 channel
+      const channelCount = 1;
+      const bytesPerSample = 2;
+      const blockAlign = channelCount * bytesPerSample;
+      const byteRate = sampleRate * blockAlign;
+
+      // Create a wav header
+      const headerBuffer = new ArrayBuffer(44);
+      const headerView = new DataView(headerBuffer);
+
+      // ChunkID "RIFF"
+      headerView.setUint8(0, 'R'.charCodeAt(0));
+      headerView.setUint8(1, 'I'.charCodeAt(0));
+      headerView.setUint8(2, 'F'.charCodeAt(0));
+      headerView.setUint8(3, 'F'.charCodeAt(0));
+      // ChunkSize (4 + (8 + SubChunk1Size) + (8 + SubChunk2Size))
+      // We'll set it later
+      // Format "WAVE"
+      headerView.setUint8(8, 'W'.charCodeAt(0));
+      headerView.setUint8(9, 'A'.charCodeAt(0));
+      headerView.setUint8(10, 'V'.charCodeAt(0));
+      headerView.setUint8(11, 'E'.charCodeAt(0));
+
+      // Subchunk1ID "fmt "
+      headerView.setUint8(12, 'f'.charCodeAt(0));
+      headerView.setUint8(13, 'm'.charCodeAt(0));
+      headerView.setUint8(14, 't'.charCodeAt(0));
+      headerView.setUint8(15, ' '.charCodeAt(0));
+      // Subchunk1Size (16 for PCM)
+      headerView.setUint32(16, 16, true);
+      // AudioFormat (1 for PCM)
+      headerView.setUint16(20, 1, true);
+      // NumChannels
+      headerView.setUint16(22, channelCount, true);
+      // SampleRate
+      headerView.setUint32(24, sampleRate, true);
+      // ByteRate = SampleRate * NumChannels * BitsPerSample/8
+      headerView.setUint32(28, byteRate, true);
+      // BlockAlign = NumChannels * BitsPerSample/8
+      headerView.setUint16(32, blockAlign, true);
+      // BitsPerSample
+      headerView.setUint16(34, bytesPerSample * 8, true);
+
+      // Subchunk2ID "data"
+      headerView.setUint8(36, 'd'.charCodeAt(0));
+      headerView.setUint8(37, 'a'.charCodeAt(0));
+      headerView.setUint8(38, 't'.charCodeAt(0));
+      headerView.setUint8(39, 'a'.charCodeAt(0));
+
+      // data size = NumSamples * NumChannels * bytesPerSample
+      const dataSize = audioBuffer.byteLength;
+      headerView.setUint32(40, dataSize, true);
+
+      // total file size - 8
+      headerView.setUint32(4, 36 + dataSize, true);
+
+      // Concatenate header and audio data
+      const wavBlob = new Blob([headerBuffer, audioBuffer], { type: "audio/wav" });
+      return wavBlob;
+    }
+
+    /********************************************************
      *  Document Ready
      ********************************************************/
     $(document).ready(function(){
@@ -256,7 +378,7 @@
       loadModelsForDropdown("#delete_model_name");
       loadModelsForDropdown("#code_model_name");
 
-      // ========== HOME: Inference ==========
+      // ========== HOME: Inference (Text) ==========
       $("#model-form").on("submit", function(e){
         e.preventDefault();
         $("#response-container").hide();
@@ -276,6 +398,100 @@
           $("#response-container").show();
         });
       });
+
+      // ========== HOME: Inference (Audio) ==========
+      $("#startRecordingBtn").click(async function(){
+        // Hide text query and submit
+        $("#textQueryContainer").addClass("hidden");
+        $("#submitQueryBtn").addClass("hidden");
+        // Show recording UI
+        $("#recordingUI").removeClass("hidden");
+        $("#response-container").hide();
+
+        audioChunks = [];
+        // Request microphone access
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Create media recorder
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+        // On data available, push the chunk
+        mediaRecorder.ondataavailable = (e) => {
+          if(e.data.size > 0) {
+            audioChunks.push(e.data);
+          }
+        };
+
+        // Start recording
+        mediaRecorder.start();
+      });
+
+      // Cancel recording
+      $("#cancelRecordingBtn").click(function(){
+        if(mediaRecorder && mediaRecorder.state !== 'inactive'){
+          mediaRecorder.stop();
+        }
+        // Reset UI
+        resetRecordingUI();
+      });
+
+      // Confirm (stop & send data)
+      $("#confirmRecordingBtn").click(async function(){
+        if(mediaRecorder && mediaRecorder.state !== 'inactive'){
+          mediaRecorder.stop();
+        }
+        // Once stopped, we'll convert to WAV and send
+        mediaRecorder.onstop = async () => {
+          $("#loader").show();
+          $("#recordingUI").addClass("hidden");
+
+          // Combine the recorded chunks
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          // Convert webm to raw PCM data in the browser is more advanced (requires separate code).
+          // For a simpler approach, we *simulate* a quick "webm -> wav" approach by actually reading it in memory.
+          // But realistically, you'd want a library to handle cross-browser format conversions properly.
+          const arrayBuffer = await blob.arrayBuffer();
+          const wavBlob = encodeWAV(arrayBuffer); // Minimal WAV header approach
+
+          // Prepare form data to send
+          const formData = new FormData();
+          formData.append('audio_data', wavBlob, 'recording.wav');
+          formData.append('model', $("#model").val());
+
+          // Post to our API
+          $.ajax({
+            url: "/api/transcribe_and_infer",
+            method: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+              $("#loader").hide();
+              if(data.response){
+                $("#response").text(data.response);
+                $("#response-container").show();
+              } else {
+                $("#response").text("Error: " + data.error);
+                $("#response-container").show();
+              }
+              resetRecordingUI();
+            },
+            error: function(xhr){
+              $("#loader").hide();
+              $("#response").text("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+              $("#response-container").show();
+              resetRecordingUI();
+            }
+          });
+        };
+      });
+
+      function resetRecordingUI() {
+        // Show text query UI
+        $("#textQueryContainer").removeClass("hidden");
+        $("#submitQueryBtn").removeClass("hidden");
+        // Hide recording UI
+        $("#recordingUI").addClass("hidden");
+      }
 
       // ========== MANAGE: Add Model ==========
       $("#add-model-form").on("submit", function(e){
