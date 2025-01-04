@@ -1,0 +1,388 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LLM Playground (Single Page)</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      background-color: #fafafa;
+      font-family: 'Roboto', sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      color: #444;
+    }
+    .container {
+      flex: 1;
+      margin-top: 2rem;
+      margin-bottom: 2rem;
+    }
+    footer {
+      background-color: #f1f1f1;
+      color: #666;
+      text-align: center;
+      padding: 1rem 0;
+      margin-top: auto;
+    }
+    .usage-pre {
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      padding: 0.75rem;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow: auto;
+      font-family: monospace;
+      white-space: pre;
+    }
+    .logs-box {
+      background: #212121;
+      color: #eee;
+      border-radius: 4px;
+      padding: 0.75rem;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: monospace;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navbar with Tabs -->
+  <nav class="navbar navbar-expand-lg" style="background-image: linear-gradient(to right, #4285f4, #ea4335, #fbbc05, #34a853);">
+    <div class="container">
+      <a class="navbar-brand text-white fw-bold" href="#">LLM Playground</a>
+    </div>
+  </nav>
+
+  <!-- Page Content -->
+  <div class="container">
+    <!-- Tabs -->
+    <ul class="nav nav-tabs" id="mainTab" role="tablist">
+      <li class="nav-item">
+        <a class="nav-link active" id="home-tab" data-bs-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="true">Home</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="manage-tab" data-bs-toggle="tab" href="#manageModels" role="tab" aria-controls="manageModels" aria-selected="false">Manage Models</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="server-tab" data-bs-toggle="tab" href="#serverControl" role="tab" aria-controls="serverControl" aria-selected="false">Server Control</a>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="mainTabContent">
+      <!-- HOME TAB (Inference) -->
+      <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
+        <div class="row justify-content-center g-4 mt-3">
+          <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header text-center bg-white">
+                <h5 class="mb-0">Triton Model Inference</h5>
+              </div>
+              <div class="card-body">
+                <form id="model-form">
+                  <div class="mb-3">
+                    <label for="model" class="form-label">Select Model</label>
+                    <select class="form-select" id="model" name="model" required>
+                      <option value="" disabled selected>Loading models...</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="query" class="form-label">Enter Query</label>
+                    <textarea class="form-control" id="query" name="query" rows="3" required></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100">Submit</button>
+                </form>
+
+                <!-- Loader -->
+                <div id="loader" class="mt-3 text-center" style="display:none;">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <p class="mt-2">Processing your request...</p>
+                </div>
+
+                <!-- Response Container -->
+                <div id="response-container" class="mt-4" style="display:none;">
+                  <h6>Response</h6>
+                  <div class="alert alert-secondary" id="response"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MANAGE MODELS TAB -->
+      <div class="tab-pane fade" id="manageModels" role="tabpanel" aria-labelledby="manage-tab">
+        <div class="row justify-content-center g-4 mt-3">
+          <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white text-center">
+                <h5 class="mb-0">Manage Models</h5>
+              </div>
+              <div class="card-body">
+                <!-- Add Model -->
+                <div class="mb-4">
+                  <button class="btn btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAddModel">
+                    Add New Model
+                  </button>
+                  <div class="collapse mt-3" id="collapseAddModel">
+                    <form id="add-model-form">
+                      <div class="mb-3">
+                        <label for="new_model_name" class="form-label">New Model Name</label>
+                        <input type="text" class="form-control" id="new_model_name" name="new_model_name" required>
+                      </div>
+                      <button type="submit" class="btn btn-primary w-100">Create Model</button>
+                    </form>
+                    <div id="add-model-result" class="mt-3" style="display:none;">
+                      <div class="alert alert-success" id="add-model-success"></div>
+                      <pre class="usage-pre mt-2" id="usage-code" style="display:none;"></pre>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Delete Model -->
+                <div class="mb-4">
+                  <button class="btn btn-danger" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDeleteModel">
+                    Delete Model
+                  </button>
+                  <div class="collapse mt-3" id="collapseDeleteModel">
+                    <form id="delete-model-form">
+                      <div class="mb-3">
+                        <label for="delete_model_name" class="form-label">Select Model Folder</label>
+                        <select class="form-select" id="delete_model_name" name="delete_model_name" required>
+                          <option value="" disabled selected>Loading models...</option>
+                        </select>
+                      </div>
+                      <button type="submit" class="btn btn-danger w-100">Delete Model</button>
+                    </form>
+                    <div id="delete-model-result" class="mt-3" style="display:none;">
+                      <div class="alert alert-success" id="delete-model-success"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Get Client Code for Existing Models -->
+                <div class="mb-4">
+                  <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGetClientCode">
+                    Get Client Code
+                  </button>
+                  <div class="collapse mt-3" id="collapseGetClientCode">
+                    <form id="get-code-form">
+                      <div class="mb-3">
+                        <label for="code_model_name" class="form-label">Select Model Folder</label>
+                        <select class="form-select" id="code_model_name" name="folder_name" required>
+                          <option value="" disabled selected>Loading models...</option>
+                        </select>
+                      </div>
+                      <button type="submit" class="btn btn-info w-100">Get Code</button>
+                    </form>
+                    <div id="get-code-result" class="mt-3" style="display:none;">
+                      <pre class="usage-pre" id="client-code-display"></pre>
+                    </div>
+                  </div>
+                </div>
+              </div> <!-- card-body -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SERVER CONTROL TAB -->
+      <div class="tab-pane fade" id="serverControl" role="tabpanel" aria-labelledby="server-tab">
+        <div class="row justify-content-center g-4 mt-3">
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white text-center">
+                <h5 class="mb-0">Triton Server Control</h5>
+              </div>
+              <div class="card-body">
+                <div class="d-grid gap-2">
+                  <button id="start-server" class="btn btn-success">Start Server</button>
+                  <button id="stop-server" class="btn btn-danger">Stop Server</button>
+                  <button id="logs-server" class="btn btn-dark">Get Triton Logs</button>
+                </div>
+                <!-- Server result messages -->
+                <div id="server-result" class="mt-3" style="display:none;">
+                  <div class="alert alert-info" id="server-message"></div>
+                </div>
+                <!-- Triton logs box -->
+                <div id="server-logs-box" class="logs-box mt-3" style="display:none;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div> <!-- /serverControl tab -->
+
+    </div> <!-- /tab-content -->
+  </div> <!-- /container -->
+
+  <!-- Footer -->
+  <footer>
+    <small>&copy; 2025 - LLM Playground (Single Page)</small>
+  </footer>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    /********************************************************
+     *  Load Models into <select> helper
+     ********************************************************/
+    function loadModelsForDropdown(selector) {
+      $.get("/api/list_models", function(data){
+        const sel = $(selector);
+        sel.empty();
+        sel.append(`<option value="" disabled selected>Select a model</option>`);
+        if(data.models && data.models.length){
+          data.models.forEach(m => {
+            sel.append(`<option value="${m}">${m}</option>`);
+          });
+        }
+      });
+    }
+
+    /********************************************************
+     *  Document Ready
+     ********************************************************/
+    $(document).ready(function(){
+      // Load models in Home tab & Manage tab
+      loadModelsForDropdown("#model");
+      loadModelsForDropdown("#delete_model_name");
+      loadModelsForDropdown("#code_model_name");
+
+      // ========== HOME: Inference ==========
+      $("#model-form").on("submit", function(e){
+        e.preventDefault();
+        $("#response-container").hide();
+        $("#loader").show();
+        $.post("/api/query", $(this).serialize(), function(data){
+          $("#loader").hide();
+          if(data.response){
+            $("#response").text(data.response);
+            $("#response-container").show();
+          } else {
+            $("#response").text("Error: " + data.error);
+            $("#response-container").show();
+          }
+        }).fail(function(xhr){
+          $("#loader").hide();
+          $("#response").text("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          $("#response-container").show();
+        });
+      });
+
+      // ========== MANAGE: Add Model ==========
+      $("#add-model-form").on("submit", function(e){
+        e.preventDefault();
+        $("#add-model-result").hide();
+        $("#usage-code").hide();
+
+        $.post("/api/add_model", $(this).serialize(), function(data){
+          if(data.error){
+            alert("Error: " + data.error);
+          } else {
+            $("#add-model-success").text(data.message);
+            $("#add-model-result").show();
+            $("#usage-code").text(data.usage_code).show();
+            // Refresh dropdowns
+            loadModelsForDropdown("#model");
+            loadModelsForDropdown("#delete_model_name");
+            loadModelsForDropdown("#code_model_name");
+          }
+        }).fail(function(xhr){
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      // ========== MANAGE: Delete Model ==========
+      $("#delete-model-form").on("submit", function(e){
+        e.preventDefault();
+        $("#delete-model-result").hide();
+        $.post("/api/delete_model", $(this).serialize(), function(data){
+          if(data.error){
+            alert("Error: " + data.error);
+          } else {
+            $("#delete-model-success").text(data.message);
+            $("#delete-model-result").show();
+            // Refresh dropdowns
+            loadModelsForDropdown("#model");
+            loadModelsForDropdown("#delete_model_name");
+            loadModelsForDropdown("#code_model_name");
+          }
+        }).fail(function(xhr){
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      // ========== MANAGE: Get Client Code ==========
+      $("#get-code-form").on("submit", function(e){
+        e.preventDefault();
+        $("#get-code-result").hide();
+        $.post("/api/get_client_code", $(this).serialize(), function(data){
+          if(data.error){
+            alert("Error: " + data.error);
+          } else {
+            $("#client-code-display").text(data.usage_code);
+            $("#get-code-result").show();
+          }
+        }).fail(function(xhr){
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      // ========== SERVER: Start ==========
+      $("#start-server").click(function(){
+        $("#server-result").hide();
+        $("#server-logs-box").hide();
+        $.post("/api/start_server", {}, function(data){
+          if(data.error){
+            alert("Error: " + data.error);
+          } else {
+            $("#server-message").text(data.message);
+            $("#server-result").show();
+          }
+        }).fail(function(xhr){
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      // ========== SERVER: Stop ==========
+      $("#stop-server").click(function(){
+        $("#server-result").hide();
+        $("#server-logs-box").hide();
+        $.post("/api/stop_server", {}, function(data){
+          if(data.error){
+            alert("Error: " + data.error);
+          } else {
+            $("#server-message").text(data.message);
+            $("#server-result").show();
+          }
+        }).fail(function(xhr){
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      // ========== SERVER: Get Logs ==========
+      $("#logs-server").click(function(){
+        $("#server-result").hide();
+        $.get("/api/get_server_logs", function(data){
+          if(data.logs){
+            $("#server-logs-box").text(data.logs).show();
+          } else {
+            $("#server-logs-box").text("No logs available.").show();
+          }
+        }).fail(function(xhr){
+          const errMsg = xhr.responseJSON?.error || xhr.statusText || "Error retrieving logs";
+          $("#server-logs-box").text(errMsg).show();
+        });
+      });
+    });
+  </script>
+</body>
+</html>
