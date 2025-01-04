@@ -1,6 +1,8 @@
 # app.py
 import os
 import io
+import tempfile
+import subprocess
 import numpy as np
 from flask import Flask, render_template, request, jsonify
 from tritonclient.http import InferenceServerClient, InferInput
@@ -37,19 +39,48 @@ def infer_model(model_name, input_text):
 
     response = client.infer(model_name, inputs)
     return response.as_numpy("OUTPUT")
-import soundfile as sf
 
-def transcribe_whisper(audio_bytes):
+def transcribe_whisper_webm(webm_bytes):
     """
-    Send audio to Whisper model on Triton for transcription.
-    Expects 16 kHz float32 audio.
+    Convert WebM to 16k mono WAV using ffmpeg, then load with librosa,
+    and send to Triton whisper model for transcription.
     """
+    # 1) Write the webm to a temporary file
+    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_input:
+        temp_input.write(webm_bytes)
+        temp_input.flush()
+        temp_webm_path = temp_input.name
+
+    # 2) Convert webm -> wav
+    temp_wav_path = temp_webm_path.replace(".webm", ".wav")
+    cmd = [
+        "ffmpeg", "-y",  # overwrite
+        "-i", temp_webm_path,
+        "-ar", "16000",  # resample to 16k
+        "-ac", "1",      # mono
+        temp_wav_path
+    ]
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError as e:
+        # Cleanup
+        if os.path.exists(temp_webm_path):
+            os.remove(temp_webm_path)
+        raise RuntimeError(f"FFmpeg conversion failed: {e}")
+
+    # 3) Load wav with librosa
+    try:
+        audio_data, _ = librosa.load(temp_wav_path, sr=16000, mono=True)
+        audio_data = audio_data.astype(np.float32)
+    finally:
+        # Cleanup temp files
+        if os.path.exists(temp_webm_path):
+            os.remove(temp_webm_path)
+        if os.path.exists(temp_wav_path):
+            os.remove(temp_wav_path)
+
+    # 4) Inference with whisper model
     client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=500)
-
-    # We will load audio from the bytes, re-sample to 16k, convert to float32
-    audio_data, sample_rate = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)
-    audio_data = audio_data.astype(np.float32)
-    sf.write("test.wav", audio_data, samplerate=16000)
     inputs = [InferInput("AUDIO_INPUT", [len(audio_data)], "FP32")]
     inputs[0].set_data_from_numpy(audio_data)
 
@@ -57,7 +88,7 @@ def transcribe_whisper(audio_bytes):
     transcription = response.as_numpy("OUTPUT")
     # Usually transcription is a single string
     if transcription is not None and transcription.size > 0:
-        print("Transcription",transcription[0].decode("utf-8"))
+        print("Transcription:",transcription[0].decode("utf-8"))
         return transcription[0].decode("utf-8")
     return ""
 
@@ -96,9 +127,9 @@ def query_model():
 @app.route('/api/transcribe_and_infer', methods=['POST'])
 def transcribe_and_infer():
     """
-    1) Receive WAV from user.
-    2) Use Whisper model to convert audio -> text.
-    3) Use selected model to get final inference from text.
+    1) Receive WebM from user.
+    2) Convert to WAV + use Whisper model to transcribe (audio -> text).
+    3) Use selected model to get final inference from the transcribed text.
     """
     model_name = request.form.get('model', '').strip()
     file = request.files.get('audio_data')
@@ -107,8 +138,8 @@ def transcribe_and_infer():
 
     try:
         # Step 1: Transcribe with Whisper
-        audio_bytes = file.read()
-        transcription_text = transcribe_whisper(audio_bytes)
+        webm_bytes = file.read()
+        transcription_text = transcribe_whisper_webm(webm_bytes)
 
         # Step 2: If user provided a model name, do the inference
         if model_name:
@@ -178,13 +209,10 @@ def api_delete_model():
 def api_get_client_code():
     """
     Return the usage code snippet for an existing sanitized model folder.
-    We don't know the original name, so we just assume user wants to
-    call Triton with the sanitized name.
     """
     folder_name = request.form.get('folder_name', '').strip()
     if not folder_name:
         return jsonify({'error': "Folder name cannot be empty."}), 400
-    # Generate code snippet for this folder
     usage_code = f"""import numpy as np
 from tritonclient.http import InferenceServerClient, InferInput
 

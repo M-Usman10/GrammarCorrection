@@ -302,74 +302,6 @@
     let audioChunks = [];
 
     /********************************************************
-     *  Helper: Convert raw recorded chunks to a WAV Blob
-     *  This is a minimal approach to create a WAV header
-     *  and append raw PCM from recorded data. For production,
-     *  you might use a more robust library.
-     ********************************************************/
-    function encodeWAV(audioBuffer, sampleRate = 48000) {
-      // For simplicity, assume 16-bit PCM, 1 channel
-      const channelCount = 1;
-      const bytesPerSample = 2;
-      const blockAlign = channelCount * bytesPerSample;
-      const byteRate = sampleRate * blockAlign;
-
-      // Create a wav header
-      const headerBuffer = new ArrayBuffer(44);
-      const headerView = new DataView(headerBuffer);
-
-      // ChunkID "RIFF"
-      headerView.setUint8(0, 'R'.charCodeAt(0));
-      headerView.setUint8(1, 'I'.charCodeAt(0));
-      headerView.setUint8(2, 'F'.charCodeAt(0));
-      headerView.setUint8(3, 'F'.charCodeAt(0));
-      // ChunkSize (4 + (8 + SubChunk1Size) + (8 + SubChunk2Size))
-      // We'll set it later
-      // Format "WAVE"
-      headerView.setUint8(8, 'W'.charCodeAt(0));
-      headerView.setUint8(9, 'A'.charCodeAt(0));
-      headerView.setUint8(10, 'V'.charCodeAt(0));
-      headerView.setUint8(11, 'E'.charCodeAt(0));
-
-      // Subchunk1ID "fmt "
-      headerView.setUint8(12, 'f'.charCodeAt(0));
-      headerView.setUint8(13, 'm'.charCodeAt(0));
-      headerView.setUint8(14, 't'.charCodeAt(0));
-      headerView.setUint8(15, ' '.charCodeAt(0));
-      // Subchunk1Size (16 for PCM)
-      headerView.setUint32(16, 16, true);
-      // AudioFormat (1 for PCM)
-      headerView.setUint16(20, 1, true);
-      // NumChannels
-      headerView.setUint16(22, channelCount, true);
-      // SampleRate
-      headerView.setUint32(24, sampleRate, true);
-      // ByteRate = SampleRate * NumChannels * BitsPerSample/8
-      headerView.setUint32(28, byteRate, true);
-      // BlockAlign = NumChannels * BitsPerSample/8
-      headerView.setUint16(32, blockAlign, true);
-      // BitsPerSample
-      headerView.setUint16(34, bytesPerSample * 8, true);
-
-      // Subchunk2ID "data"
-      headerView.setUint8(36, 'd'.charCodeAt(0));
-      headerView.setUint8(37, 'a'.charCodeAt(0));
-      headerView.setUint8(38, 't'.charCodeAt(0));
-      headerView.setUint8(39, 'a'.charCodeAt(0));
-
-      // data size = NumSamples * NumChannels * bytesPerSample
-      const dataSize = audioBuffer.byteLength;
-      headerView.setUint32(40, dataSize, true);
-
-      // total file size - 8
-      headerView.setUint32(4, 36 + dataSize, true);
-
-      // Concatenate header and audio data
-      const wavBlob = new Blob([headerBuffer, audioBuffer], { type: "audio/wav" });
-      return wavBlob;
-    }
-
-    /********************************************************
      *  Document Ready
      ********************************************************/
     $(document).ready(function(){
@@ -411,17 +343,14 @@
         audioChunks = [];
         // Request microphone access
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Create media recorder
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        // Create media recorder (webm/opus)
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
 
-        // On data available, push the chunk
         mediaRecorder.ondataavailable = (e) => {
           if(e.data.size > 0) {
             audioChunks.push(e.data);
           }
         };
-
-        // Start recording
         mediaRecorder.start();
       });
 
@@ -439,25 +368,19 @@
         if(mediaRecorder && mediaRecorder.state !== 'inactive'){
           mediaRecorder.stop();
         }
-        // Once stopped, we'll convert to WAV and send
         mediaRecorder.onstop = async () => {
           $("#loader").show();
           $("#recordingUI").addClass("hidden");
 
-          // Combine the recorded chunks
-          const blob = new Blob(audioChunks, { type: 'audio/webm' });
-          // Convert webm to raw PCM data in the browser is more advanced (requires separate code).
-          // For a simpler approach, we *simulate* a quick "webm -> wav" approach by actually reading it in memory.
-          // But realistically, you'd want a library to handle cross-browser format conversions properly.
-          const arrayBuffer = await blob.arrayBuffer();
-          const wavBlob = encodeWAV(arrayBuffer); // Minimal WAV header approach
+          // Combine the recorded chunks into a single Blob
+          const blob = new Blob(audioChunks, { type: 'audio/webm; codecs=opus' });
 
-          // Prepare form data to send
+          // Prepare form data to send to server
           const formData = new FormData();
-          formData.append('audio_data', wavBlob, 'recording.wav');
+          formData.append('audio_data', blob, 'recording.webm');
           formData.append('model', $("#model").val());
 
-          // Post to our API
+          // Post to our API for transcription + inference
           $.ajax({
             url: "/api/transcribe_and_infer",
             method: "POST",
