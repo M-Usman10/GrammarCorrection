@@ -1,0 +1,20 @@
+name: "openai-gpt4o-mini"
+backend: "python"
+
+max_batch_size: 8
+
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
+
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
