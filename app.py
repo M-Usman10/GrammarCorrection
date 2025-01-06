@@ -77,7 +77,7 @@ def transcribe_whisper_webm(webm_bytes):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('Google-Like.html')
 
 @app.route('/api/list_models', methods=['GET'])
 def api_list_models():

@@ -1,80 +1,140 @@
-<!-- index.html -->
+<!-- GalaxyGlaze.html (Example of a "very visually appealing" new theme) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LLM Playground (Single Page)</title>
+  <title>LLM Playground - Galaxy Glaze</title>
 
   <!-- Bootstrap CSS -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     rel="stylesheet"
   />
-  <!-- Bootstrap Icons (for mic, check, x, and volume icons) -->
+  <!-- Bootstrap Icons -->
   <link
     rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
   />
 
   <style>
+    /* Galaxy / Space-inspired background and neon accent colors */
     body {
-      background-color: #fafafa;
+      background: radial-gradient(circle at top left, #1b2735 0%, #090a0f 100%);
       font-family: 'Roboto', sans-serif;
+      color: #eee;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
-      color: #444;
+    }
+    .navbar {
+      background-color: #2c2f33;
+      border-bottom: 1px solid #111;
+    }
+    .navbar-brand {
+      color: #72dec2 !important;
+      font-weight: bold;
+    }
+    .nav-link {
+      color: #aaa !important;
+    }
+    .nav-link.active {
+      color: #fff !important;
+    }
+    footer {
+      background-color: #2c2f33;
+      color: #888;
+      text-align: center;
+      padding: 1rem 0;
+      margin-top: auto;
+      border-top: 1px solid #111;
     }
     .container {
       flex: 1;
       margin-top: 2rem;
       margin-bottom: 2rem;
     }
-    footer {
-      background-color: #f1f1f1;
-      color: #666;
-      text-align: center;
-      padding: 1rem 0;
-      margin-top: auto;
-    }
-    .usage-pre {
-      background: #f8f9fa;
-      border: 1px solid #ddd;
-      padding: 0.75rem;
-      border-radius: 4px;
-      max-height: 300px;
-      overflow: auto;
-      font-family: monospace;
-      white-space: pre;
-    }
-    .logs-box {
-      background: #212121;
+    .card {
+      background-color: #24272b;
+      border: none;
+      border-radius: 8px;
       color: #eee;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+    .card-header {
+      background-color: #1f2124;
+      border-bottom: 1px solid #333;
+      text-align: center;
+    }
+    .form-select, .form-control {
+      background-color: #333;
+      color: #eee;
+      border: 1px solid #444;
+      border-radius: 6px;
+    }
+    .form-label {
+      font-weight: 500;
+    }
+    .btn-primary, .btn-success, .btn-danger, .btn-dark, .btn-secondary, .btn-info {
+      border: none;
+      transition: all 0.3s ease;
+    }
+    .btn-primary {
+      background-color: #72dec2;
+      color: #000;
+    }
+    .btn-primary:hover {
+      background-color: #5ddbb6;
+    }
+    .btn-success {
+      background-color: #6cf297;
+      color: #000;
+    }
+    .btn-success:hover {
+      background-color: #54e27e;
+    }
+    .btn-danger {
+      background-color: #f27777;
+      color: #000;
+    }
+    .btn-danger:hover {
+      background-color: #e26565;
+    }
+    .btn-info {
+      background-color: #82e2ff;
+      color: #000;
+    }
+    .btn-info:hover {
+      background-color: #68d3f0;
+    }
+    .btn-dark {
+      background-color: #494b4e;
+    }
+    .btn-dark:hover {
+      background-color: #303234;
+    }
+    .btn-secondary {
+      background-color: #666;
+    }
+    .btn-secondary:hover {
+      background-color: #555;
+    }
+    .alert-secondary {
+      background-color: #383b3e;
+      border: none;
+      color: #eee;
+    }
+    /* Make logs box bigger */
+    .logs-box {
+      background: #000000;
+      color: #00ffbb;
       border-radius: 4px;
       padding: 0.75rem;
-      max-height: 300px;
+      max-height: 500px;
       overflow-y: auto;
       font-family: monospace;
       white-space: pre;
-    }
-    .mic-btn {
-      background-image: linear-gradient(to right, #4285f4, #ea4335, #fbbc05, #34a853);
-      color: #fff;
-      border: none;
-    }
-    .mic-btn i {
-      font-size: 1.2rem;
-    }
-    /* Removed gradient and colors from speaker button */
-    .speaker-btn {
-      background-color: #6c757d;
-      color: #fff;
-      border: none;
-    }
-    .recording-indicator {
-      font-weight: bold;
-      color: #d9534f; /* red-ish */
+      border: 1px solid #00ffbb;
     }
     .hidden {
       display: none !important;
@@ -82,40 +142,47 @@
   </style>
 </head>
 <body>
-  <!-- Navbar with Tabs -->
-  <nav class="navbar navbar-expand-lg" style="background-image: linear-gradient(to right, #4285f4, #ea4335, #fbbc05, #34a853);">
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg">
     <div class="container">
-      <a class="navbar-brand text-white fw-bold" href="#">LLM Playground</a>
+      <a class="navbar-brand" href="#">LLM Playground (Galaxy Glaze)</a>
     </div>
   </nav>
 
-  <!-- Page Content -->
+  <!-- Container -->
   <div class="container">
     <!-- Tabs -->
-    <ul class="nav nav-tabs" id="mainTab" role="tablist">
+    <ul class="nav nav-tabs" id="mainTab" role="tablist" style="border-bottom: 1px solid #444;">
       <li class="nav-item">
-        <a class="nav-link active" id="home-tab" data-bs-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="true">Home</a>
+        <a class="nav-link active" id="home-tab" data-bs-toggle="tab" href="#home" role="tab"
+           aria-controls="home" aria-selected="true">
+          Home
+        </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="manage-tab" data-bs-toggle="tab" href="#manageModels" role="tab" aria-controls="manageModels" aria-selected="false">Manage Models</a>
+        <a class="nav-link" id="manage-tab" data-bs-toggle="tab" href="#manageModels" role="tab"
+           aria-controls="manageModels" aria-selected="false">
+          Manage Models
+        </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="server-tab" data-bs-toggle="tab" href="#serverControl" role="tab" aria-controls="serverControl" aria-selected="false">Server Control</a>
+        <a class="nav-link" id="server-tab" data-bs-toggle="tab" href="#serverControl" role="tab"
+           aria-controls="serverControl" aria-selected="false">
+          Server Control
+        </a>
       </li>
     </ul>
 
     <div class="tab-content" id="mainTabContent">
-      <!-- HOME TAB (Inference) -->
+      <!-- HOME TAB -->
       <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
-        <div class="row justify-content-center g-4 mt-3">
+        <div class="row justify-content-center mt-3">
           <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header text-center bg-white">
-                <h5 class="mb-0">Triton Model Inference</h5>
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0 text-light">Triton Model Inference</h5>
               </div>
               <div class="card-body">
-
-                <!-- Mic + Normal Query Container -->
                 <form id="model-form">
                   <div class="mb-3">
                     <label for="model" class="form-label">Select Model</label>
@@ -130,16 +197,14 @@
                   <button type="submit" class="btn btn-primary w-100" id="submitQueryBtn">Submit</button>
                 </form>
 
-                <!-- Microphone Record Button -->
                 <div class="text-center mt-3">
-                  <button id="startRecordingBtn" class="btn mic-btn">
+                  <button id="startRecordingBtn" class="btn btn-info">
                     <i class="bi bi-mic"></i> Record
                   </button>
                 </div>
 
-                <!-- Recording UI (hidden initially) -->
                 <div id="recordingUI" class="mt-4 hidden text-center">
-                  <p class="recording-indicator">Recording...</p>
+                  <p class="fw-bold text-danger">Recording...</p>
                   <div class="d-flex justify-content-center gap-3">
                     <button id="cancelRecordingBtn" class="btn btn-secondary">
                       <i class="bi bi-x-lg"></i>
@@ -150,36 +215,33 @@
                   </div>
                 </div>
 
-                <!-- Loader -->
                 <div id="loader" class="mt-3 text-center" style="display:none;">
-                  <div class="spinner-border text-primary" role="status">
+                  <div class="spinner-border text-light" role="status">
                     <span class="visually-hidden">Loading...</span>
                   </div>
-                  <p class="mt-2">Processing your request...</p>
+                  <p class="mt-2 text-light">Processing your request...</p>
                 </div>
 
-                <!-- Response Container -->
                 <div id="response-container" class="mt-4" style="display:none;">
-                  <h6>Response</h6>
+                  <h6 class="text-light">Response</h6>
                   <div class="alert alert-secondary" id="response"></div>
-                  <button id="playTTSBtn" class="btn speaker-btn">
+                  <button id="playTTSBtn" class="btn btn-dark">
                     <i class="bi bi-volume-up"></i>
                   </button>
                 </div>
-
-              </div>
+              </div> <!-- card-body -->
             </div>
           </div>
         </div>
-      </div> <!-- end HOME TAB -->
+      </div>
 
       <!-- MANAGE MODELS TAB -->
       <div class="tab-pane fade" id="manageModels" role="tabpanel" aria-labelledby="manage-tab">
-        <div class="row justify-content-center g-4 mt-3">
+        <div class="row justify-content-center mt-3">
           <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white text-center">
-                <h5 class="mb-0">Manage Models</h5>
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0 text-light">Manage Models</h5>
               </div>
               <div class="card-body">
                 <!-- Add Model -->
@@ -197,65 +259,65 @@
                     </form>
                     <div id="add-model-result" class="mt-3" style="display:none;">
                       <div class="alert alert-success" id="add-model-success"></div>
-                      <pre class="usage-pre mt-2" id="usage-code" style="display:none;"></pre>
+                      <pre class="logs-box mt-2" id="usage-code" style="display:none;"></pre>
                     </div>
-                  </div>
                 </div>
+              </div>
 
-                <!-- Delete Model -->
-                <div class="mb-4">
-                  <button class="btn btn-danger" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDeleteModel">
-                    Delete Model
-                  </button>
-                  <div class="collapse mt-3" id="collapseDeleteModel">
-                    <form id="delete-model-form">
-                      <div class="mb-3">
-                        <label for="delete_model_name" class="form-label">Select Model Folder</label>
-                        <select class="form-select" id="delete_model_name" name="delete_model_name" required>
-                          <option value="" disabled selected>Loading models...</option>
-                        </select>
-                      </div>
-                      <button type="submit" class="btn btn-danger w-100">Delete Model</button>
-                    </form>
-                    <div id="delete-model-result" class="mt-3" style="display:none;">
-                      <div class="alert alert-success" id="delete-model-success"></div>
+              <!-- Delete Model -->
+              <div class="mb-4">
+                <button class="btn btn-danger" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDeleteModel">
+                  Delete Model
+                </button>
+                <div class="collapse mt-3" id="collapseDeleteModel">
+                  <form id="delete-model-form">
+                    <div class="mb-3">
+                      <label for="delete_model_name" class="form-label">Select Model Folder</label>
+                      <select class="form-select" id="delete_model_name" name="delete_model_name" required>
+                        <option value="" disabled selected>Loading models...</option>
+                      </select>
                     </div>
+                    <button type="submit" class="btn btn-danger w-100">Delete Model</button>
+                  </form>
+                  <div id="delete-model-result" class="mt-3" style="display:none;">
+                    <div class="alert alert-success" id="delete-model-success"></div>
                   </div>
                 </div>
+              </div>
 
-                <!-- Get Client Code for Existing Models -->
-                <div class="mb-4">
-                  <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGetClientCode">
-                    Get Client Code
-                  </button>
-                  <div class="collapse mt-3" id="collapseGetClientCode">
-                    <form id="get-code-form">
-                      <div class="mb-3">
-                        <label for="code_model_name" class="form-label">Select Model Folder</label>
-                        <select class="form-select" id="code_model_name" name="folder_name" required>
-                          <option value="" disabled selected>Loading models...</option>
-                        </select>
-                      </div>
-                      <button type="submit" class="btn btn-info w-100">Get Code</button>
-                    </form>
-                    <div id="get-code-result" class="mt-3" style="display:none;">
-                      <pre class="usage-pre" id="client-code-display"></pre>
+              <!-- Get Client Code -->
+              <div class="mb-4">
+                <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGetClientCode">
+                  Get Client Code
+                </button>
+                <div class="collapse mt-3" id="collapseGetClientCode">
+                  <form id="get-code-form">
+                    <div class="mb-3">
+                      <label for="code_model_name" class="form-label">Select Model Folder</label>
+                      <select class="form-select" id="code_model_name" name="folder_name" required>
+                        <option value="" disabled selected>Loading models...</option>
+                      </select>
                     </div>
+                    <button type="submit" class="btn btn-info w-100">Get Code</button>
+                  </form>
+                  <div id="get-code-result" class="mt-3" style="display:none;">
+                    <pre class="logs-box" id="client-code-display"></pre>
                   </div>
                 </div>
-              </div> <!-- card-body -->
-            </div>
+              </div>
+            </div> <!-- card-body -->
           </div>
         </div>
-      </div> <!-- end MANAGE MODELS TAB -->
+      </div>
+    </div>
 
       <!-- SERVER CONTROL TAB -->
       <div class="tab-pane fade" id="serverControl" role="tabpanel" aria-labelledby="server-tab">
-        <div class="row justify-content-center g-4 mt-3">
+        <div class="row justify-content-center mt-3">
           <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white text-center">
-                <h5 class="mb-0">Triton Server Control</h5>
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0 text-light">Triton Server Control</h5>
               </div>
               <div class="card-body">
                 <div class="d-grid gap-2">
@@ -263,35 +325,29 @@
                   <button id="stop-server" class="btn btn-danger">Stop Server</button>
                   <button id="logs-server" class="btn btn-dark">Get Triton Logs</button>
                 </div>
-                <!-- Server result messages -->
                 <div id="server-result" class="mt-3" style="display:none;">
                   <div class="alert alert-info" id="server-message"></div>
                 </div>
-                <!-- Triton logs box -->
                 <div id="server-logs-box" class="logs-box mt-3" style="display:none;"></div>
               </div>
             </div>
           </div>
         </div>
-      </div> <!-- /serverControl tab -->
-    </div> <!-- /tab-content -->
-  </div> <!-- /container -->
+      </div> <!-- serverControl tab -->
+    </div> <!-- tab-content -->
+  </div> <!-- container -->
 
   <!-- Footer -->
   <footer>
-    <small>&copy; 2025 - LLM Playground (Single Page)</small>
+    <small>&copy; 2025 - LLM Playground (Galaxy Glaze)</small>
   </footer>
 
-  <!-- JS: jQuery + Bootstrap Bundle + Our scripts -->
+  <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
   </script>
-
   <script>
-    /********************************************************
-     *  Load Models into <select> helper
-     ********************************************************/
     function loadModelsForDropdown(selector) {
       $.get("/api/list_models", function(data){
         const sel = $(selector);
@@ -305,22 +361,14 @@
       });
     }
 
-    /********************************************************
-     *  Global Variables for Audio Recording
-     ********************************************************/
     let mediaRecorder;
     let audioChunks = [];
 
-    /********************************************************
-     *  Document Ready
-     ********************************************************/
     $(document).ready(function(){
-      // Load models in Home tab & Manage tab
       loadModelsForDropdown("#model");
       loadModelsForDropdown("#delete_model_name");
       loadModelsForDropdown("#code_model_name");
 
-      // ========== HOME: Inference (Text) ==========
       $("#model-form").on("submit", function(e){
         e.preventDefault();
         $("#response-container").hide();
@@ -341,7 +389,7 @@
         });
       });
 
-      // ========== HOME: Inference (Audio) ==========
+      // Audio
       $("#startRecordingBtn").click(async function(){
         $("#textQueryContainer").addClass("hidden");
         $("#submitQueryBtn").addClass("hidden");
@@ -367,7 +415,7 @@
         resetRecordingUI();
       });
 
-      $("#confirmRecordingBtn").click(async function(){
+      $("#confirmRecordingBtn").click(function(){
         if(mediaRecorder && mediaRecorder.state !== 'inactive'){
           mediaRecorder.stop();
         }
@@ -413,7 +461,7 @@
         $("#recordingUI").addClass("hidden");
       }
 
-      // ========== HOME: Play TTS for Response (Local TTS) ==========
+      // TTS
       $("#playTTSBtn").click(function(){
         const text = $("#response").text().trim();
         if(!text) return;
@@ -427,12 +475,11 @@
         });
       });
 
-      // ========== MANAGE: Add Model ==========
+      // Add Model
       $("#add-model-form").on("submit", function(e){
         e.preventDefault();
         $("#add-model-result").hide();
         $("#usage-code").hide();
-
         $.post("/api/add_model", $(this).serialize(), function(data){
           if(data.error){
             alert("Error: " + data.error);
@@ -449,7 +496,7 @@
         });
       });
 
-      // ========== MANAGE: Delete Model ==========
+      // Delete Model
       $("#delete-model-form").on("submit", function(e){
         e.preventDefault();
         $("#delete-model-result").hide();
@@ -468,7 +515,7 @@
         });
       });
 
-      // ========== MANAGE: Get Client Code ==========
+      // Get Client Code
       $("#get-code-form").on("submit", function(e){
         e.preventDefault();
         $("#get-code-result").hide();
@@ -484,7 +531,7 @@
         });
       });
 
-      // ========== SERVER: Start ==========
+      // Server
       $("#start-server").click(function(){
         $("#server-result").hide();
         $("#server-logs-box").hide();
@@ -500,7 +547,6 @@
         });
       });
 
-      // ========== SERVER: Stop ==========
       $("#stop-server").click(function(){
         $("#server-result").hide();
         $("#server-logs-box").hide();
@@ -516,7 +562,6 @@
         });
       });
 
-      // ========== SERVER: Get Logs ==========
       $("#logs-server").click(function(){
         $("#server-result").hide();
         $.get("/api/get_server_logs", function(data){

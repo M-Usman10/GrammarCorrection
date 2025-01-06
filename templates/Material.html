@@ -1,30 +1,35 @@
-<!-- index.html -->
+<!-- Material-Light.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LLM Playground (Single Page)</title>
+  <title>LLM Playground - Material Light</title>
 
   <!-- Bootstrap CSS -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     rel="stylesheet"
   />
-  <!-- Bootstrap Icons (for mic, check, x, and volume icons) -->
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
-  />
 
   <style>
+    /* Material-inspired color palette */
     body {
-      background-color: #fafafa;
+      background-color: #f5f5f5;
       font-family: 'Roboto', sans-serif;
+      color: #333;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
-      color: #444;
+    }
+    .navbar {
+      background-color: #6200ee !important;
+    }
+    .navbar-brand {
+      font-weight: bold;
+    }
+    .navbar-brand, .navbar-nav .nav-link {
+      color: #fff !important;
     }
     .container {
       flex: 1;
@@ -33,48 +38,50 @@
     }
     footer {
       background-color: #f1f1f1;
-      color: #666;
       text-align: center;
       padding: 1rem 0;
+      color: #555;
       margin-top: auto;
     }
-    .usage-pre {
-      background: #f8f9fa;
-      border: 1px solid #ddd;
-      padding: 0.75rem;
-      border-radius: 4px;
-      max-height: 300px;
-      overflow: auto;
-      font-family: monospace;
-      white-space: pre;
+    .card {
+      border: none;
+      border-radius: 8px;
     }
+    .card-header {
+      background-color: #6200ee;
+      color: #fff;
+      border-bottom: none;
+      font-weight: 500;
+      text-align: center;
+    }
+    .form-label {
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    .form-select,
+    .form-control {
+      border-radius: 6px;
+    }
+    .btn-submit {
+      background-color: #6200ee;
+      border: none;
+      font-weight: 500;
+      border-radius: 6px;
+      transition: background-color 0.3s ease;
+    }
+    .btn-submit:hover {
+      background-color: #4500b5;
+    }
+    /* Make logs box bigger */
     .logs-box {
       background: #212121;
       color: #eee;
       border-radius: 4px;
       padding: 0.75rem;
-      max-height: 300px;
+      max-height: 500px;
       overflow-y: auto;
       font-family: monospace;
       white-space: pre;
-    }
-    .mic-btn {
-      background-image: linear-gradient(to right, #4285f4, #ea4335, #fbbc05, #34a853);
-      color: #fff;
-      border: none;
-    }
-    .mic-btn i {
-      font-size: 1.2rem;
-    }
-    /* Removed gradient and colors from speaker button */
-    .speaker-btn {
-      background-color: #6c757d;
-      color: #fff;
-      border: none;
-    }
-    .recording-indicator {
-      font-weight: bold;
-      color: #d9534f; /* red-ish */
     }
     .hidden {
       display: none !important;
@@ -82,40 +89,44 @@
   </style>
 </head>
 <body>
-  <!-- Navbar with Tabs -->
-  <nav class="navbar navbar-expand-lg" style="background-image: linear-gradient(to right, #4285f4, #ea4335, #fbbc05, #34a853);">
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg">
     <div class="container">
-      <a class="navbar-brand text-white fw-bold" href="#">LLM Playground</a>
+      <a class="navbar-brand" href="#">LLM Playground (Material Light)</a>
     </div>
   </nav>
 
-  <!-- Page Content -->
+  <!-- Main container -->
   <div class="container">
     <!-- Tabs -->
     <ul class="nav nav-tabs" id="mainTab" role="tablist">
       <li class="nav-item">
-        <a class="nav-link active" id="home-tab" data-bs-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="true">Home</a>
+        <a class="nav-link active" id="home-tab" data-bs-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="true">
+          Home
+        </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="manage-tab" data-bs-toggle="tab" href="#manageModels" role="tab" aria-controls="manageModels" aria-selected="false">Manage Models</a>
+        <a class="nav-link" id="manage-tab" data-bs-toggle="tab" href="#manageModels" role="tab" aria-controls="manageModels" aria-selected="false">
+          Manage Models
+        </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="server-tab" data-bs-toggle="tab" href="#serverControl" role="tab" aria-controls="serverControl" aria-selected="false">Server Control</a>
+        <a class="nav-link" id="server-tab" data-bs-toggle="tab" href="#serverControl" role="tab" aria-controls="serverControl" aria-selected="false">
+          Server Control
+        </a>
       </li>
     </ul>
 
     <div class="tab-content" id="mainTabContent">
-      <!-- HOME TAB (Inference) -->
+      <!-- HOME TAB -->
       <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
-        <div class="row justify-content-center g-4 mt-3">
+        <div class="row justify-content-center mt-3">
           <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header text-center bg-white">
-                <h5 class="mb-0">Triton Model Inference</h5>
+            <div class="card shadow-sm">
+              <div class="card-header">
+                <h5 class="my-2">Triton Model Inference</h5>
               </div>
               <div class="card-body">
-
-                <!-- Mic + Normal Query Container -->
                 <form id="model-form">
                   <div class="mb-3">
                     <label for="model" class="form-label">Select Model</label>
@@ -125,21 +136,27 @@
                   </div>
                   <div class="mb-3" id="textQueryContainer">
                     <label for="query" class="form-label">Enter Query</label>
-                    <textarea class="form-control" id="query" name="query" rows="3" required></textarea>
+                    <textarea
+                      class="form-control"
+                      id="query"
+                      name="query"
+                      rows="3"
+                      required
+                    ></textarea>
                   </div>
-                  <button type="submit" class="btn btn-primary w-100" id="submitQueryBtn">Submit</button>
+                  <button type="submit" class="btn btn-submit w-100" id="submitQueryBtn">Submit</button>
                 </form>
 
-                <!-- Microphone Record Button -->
+                <!-- Record Button -->
                 <div class="text-center mt-3">
-                  <button id="startRecordingBtn" class="btn mic-btn">
+                  <button id="startRecordingBtn" class="btn btn-success">
                     <i class="bi bi-mic"></i> Record
                   </button>
                 </div>
 
-                <!-- Recording UI (hidden initially) -->
+                <!-- Recording UI -->
                 <div id="recordingUI" class="mt-4 hidden text-center">
-                  <p class="recording-indicator">Recording...</p>
+                  <p class="text-danger fw-bold">Recording...</p>
                   <div class="d-flex justify-content-center gap-3">
                     <button id="cancelRecordingBtn" class="btn btn-secondary">
                       <i class="bi bi-x-lg"></i>
@@ -162,24 +179,24 @@
                 <div id="response-container" class="mt-4" style="display:none;">
                   <h6>Response</h6>
                   <div class="alert alert-secondary" id="response"></div>
-                  <button id="playTTSBtn" class="btn speaker-btn">
+                  <button id="playTTSBtn" class="btn btn-secondary">
                     <i class="bi bi-volume-up"></i>
                   </button>
                 </div>
 
-              </div>
+              </div> <!-- card-body -->
             </div>
           </div>
         </div>
-      </div> <!-- end HOME TAB -->
+      </div>
 
       <!-- MANAGE MODELS TAB -->
       <div class="tab-pane fade" id="manageModels" role="tabpanel" aria-labelledby="manage-tab">
-        <div class="row justify-content-center g-4 mt-3">
+        <div class="row justify-content-center mt-3">
           <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white text-center">
-                <h5 class="mb-0">Manage Models</h5>
+            <div class="card shadow-sm">
+              <div class="card-header text-white" style="background-color: #6200ee;">
+                <h5 class="my-2 text-center">Manage Models</h5>
               </div>
               <div class="card-body">
                 <!-- Add Model -->
@@ -223,7 +240,7 @@
                   </div>
                 </div>
 
-                <!-- Get Client Code for Existing Models -->
+                <!-- Get Client Code -->
                 <div class="mb-4">
                   <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGetClientCode">
                     Get Client Code
@@ -247,15 +264,15 @@
             </div>
           </div>
         </div>
-      </div> <!-- end MANAGE MODELS TAB -->
+      </div>
 
       <!-- SERVER CONTROL TAB -->
       <div class="tab-pane fade" id="serverControl" role="tabpanel" aria-labelledby="server-tab">
-        <div class="row justify-content-center g-4 mt-3">
+        <div class="row justify-content-center mt-3">
           <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white text-center">
-                <h5 class="mb-0">Triton Server Control</h5>
+            <div class="card shadow-sm">
+              <div class="card-header text-white" style="background-color: #6200ee;">
+                <h5 class="my-2 text-center">Triton Server Control</h5>
               </div>
               <div class="card-body">
                 <div class="d-grid gap-2">
@@ -263,23 +280,20 @@
                   <button id="stop-server" class="btn btn-danger">Stop Server</button>
                   <button id="logs-server" class="btn btn-dark">Get Triton Logs</button>
                 </div>
-                <!-- Server result messages -->
                 <div id="server-result" class="mt-3" style="display:none;">
                   <div class="alert alert-info" id="server-message"></div>
                 </div>
-                <!-- Triton logs box -->
                 <div id="server-logs-box" class="logs-box mt-3" style="display:none;"></div>
               </div>
             </div>
           </div>
         </div>
-      </div> <!-- /serverControl tab -->
-    </div> <!-- /tab-content -->
-  </div> <!-- /container -->
+      </div> <!-- serverControl tab -->
+    </div> <!-- tab-content -->
+  </div> <!-- container -->
 
-  <!-- Footer -->
   <footer>
-    <small>&copy; 2025 - LLM Playground (Single Page)</small>
+    <small>&copy; 2025 - LLM Playground (Material Light)</small>
   </footer>
 
   <!-- JS: jQuery + Bootstrap Bundle + Our scripts -->
@@ -305,22 +319,15 @@
       });
     }
 
-    /********************************************************
-     *  Global Variables for Audio Recording
-     ********************************************************/
     let mediaRecorder;
     let audioChunks = [];
 
-    /********************************************************
-     *  Document Ready
-     ********************************************************/
     $(document).ready(function(){
-      // Load models in Home tab & Manage tab
       loadModelsForDropdown("#model");
       loadModelsForDropdown("#delete_model_name");
       loadModelsForDropdown("#code_model_name");
 
-      // ========== HOME: Inference (Text) ==========
+      // Text Inference
       $("#model-form").on("submit", function(e){
         e.preventDefault();
         $("#response-container").hide();
@@ -341,7 +348,7 @@
         });
       });
 
-      // ========== HOME: Inference (Audio) ==========
+      // Audio Inference
       $("#startRecordingBtn").click(async function(){
         $("#textQueryContainer").addClass("hidden");
         $("#submitQueryBtn").addClass("hidden");
@@ -413,7 +420,7 @@
         $("#recordingUI").addClass("hidden");
       }
 
-      // ========== HOME: Play TTS for Response (Local TTS) ==========
+      // Local TTS
       $("#playTTSBtn").click(function(){
         const text = $("#response").text().trim();
         if(!text) return;
@@ -427,12 +434,11 @@
         });
       });
 
-      // ========== MANAGE: Add Model ==========
+      // Add Model
       $("#add-model-form").on("submit", function(e){
         e.preventDefault();
         $("#add-model-result").hide();
         $("#usage-code").hide();
-
         $.post("/api/add_model", $(this).serialize(), function(data){
           if(data.error){
             alert("Error: " + data.error);
@@ -449,7 +455,7 @@
         });
       });
 
-      // ========== MANAGE: Delete Model ==========
+      // Delete Model
       $("#delete-model-form").on("submit", function(e){
         e.preventDefault();
         $("#delete-model-result").hide();
@@ -468,7 +474,7 @@
         });
       });
 
-      // ========== MANAGE: Get Client Code ==========
+      // Get Client Code
       $("#get-code-form").on("submit", function(e){
         e.preventDefault();
         $("#get-code-result").hide();
@@ -484,7 +490,7 @@
         });
       });
 
-      // ========== SERVER: Start ==========
+      // Server Control
       $("#start-server").click(function(){
         $("#server-result").hide();
         $("#server-logs-box").hide();
@@ -500,7 +506,6 @@
         });
       });
 
-      // ========== SERVER: Stop ==========
       $("#stop-server").click(function(){
         $("#server-result").hide();
         $("#server-logs-box").hide();
@@ -516,7 +521,6 @@
         });
       });
 
-      // ========== SERVER: Get Logs ==========
       $("#logs-server").click(function(){
         $("#server-result").hide();
         $.get("/api/get_server_logs", function(data){

@@ -235,13 +235,21 @@ def stop_triton_server():
 
 def get_triton_logs():
     """
-    Return Triton server logs by calling 'docker logs custom_tritonserver'.
+    Return more complete Triton server logs from container.
+    Using --since=0 to retrieve all logs from container start.
     """
     status = get_container_status(TRITON_CONTAINER_NAME)
     if status == "running":
         try:
-            logs = subprocess.check_output(["docker", "logs", TRITON_CONTAINER_NAME])
-            return logs.decode('utf-8', errors='replace')
+            # Retrieve all logs since container started
+            # You can also adjust --tail to a large number if needed
+            logs = subprocess.check_output([
+                "docker", "logs", "--since=0",
+                TRITON_CONTAINER_NAME
+            ], stderr=subprocess.STDOUT)
+            return logs.decode("utf-8", errors="replace")
+        except subprocess.CalledProcessError as e:
+            return f"Error retrieving logs: {e.output.decode('utf-8', errors='replace')}"
         except Exception as e:
             return f"Error retrieving logs: {e}"
     else:
