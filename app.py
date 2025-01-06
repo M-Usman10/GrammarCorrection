@@ -1,4 +1,3 @@
-# app.py
 import os
 import io
 import tempfile
@@ -8,7 +7,7 @@ import numpy as np
 import librosa
 from flask import Flask, render_template, request, jsonify
 from tritonclient.http import InferenceServerClient, InferInput
-from TTS.api import TTS  # Directly use TTS here
+from TTS.api import TTS
 
 from utils import (
     list_models,
@@ -114,28 +113,49 @@ def transcribe_and_infer():
                 final_text = output[0].decode('utf-8')
             else:
                 final_text = ""
-            return jsonify({'response': final_text})
+            return jsonify({'transcription': transcription_text, 'response': final_text})
         else:
-            return jsonify({'response': transcription_text})
+            return jsonify({'transcription': transcription_text, 'response': transcription_text})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tts', methods=['POST'])
 def tts_endpoint():
     text = request.form.get('text', '')
+    speaker = request.form.get('speaker', 'p229')
+    speed_str = request.form.get('speed', '1.0')
     if not text:
         return jsonify({'error': 'No text provided.'}), 400
+
     try:
+        speed = float(speed_str)
+        if speed < 0.5:
+            speed = 0.5
+        if speed > 2.0:
+            speed = 2.0
+
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
             tmp_path = tmp.name
 
-        # Directly use TTS (without Triton model)
         local_tts = TTS(model_name="tts_models/en/vctk/vits")
-        local_tts.tts_to_file(text=text, file_path=tmp_path, speaker="p229")
+        local_tts.tts_to_file(text=text, file_path=tmp_path, speaker=speaker)
 
-        with open(tmp_path, 'rb') as f:
-            raw_audio = f.read()
-        if os.path.exists(tmp_path):
+        if abs(speed - 1.0) > 1e-5:
+            tmp_output_path = tmp_path + '.speed.wav'
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", tmp_path,
+                "-filter:a", f"atempo={speed}",
+                tmp_output_path
+            ]
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            with open(tmp_output_path, 'rb') as f:
+                raw_audio = f.read()
+            os.remove(tmp_output_path)
+            os.remove(tmp_path)
+        else:
+            with open(tmp_path, 'rb') as f:
+                raw_audio = f.read()
             os.remove(tmp_path)
 
         base64_audio = base64.b64encode(raw_audio).decode('utf-8')

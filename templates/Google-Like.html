@@ -1,4 +1,3 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +52,7 @@
       color: #eee;
       border-radius: 4px;
       padding: 0.75rem;
-      max-height: 300px;
+      max-height: 600px;
       overflow-y: auto;
       font-family: monospace;
       white-space: pre;
@@ -66,7 +65,6 @@
     .mic-btn i {
       font-size: 1.2rem;
     }
-    /* Removed gradient and colors from speaker button */
     .speaker-btn {
       background-color: #6c757d;
       color: #fff;
@@ -74,7 +72,7 @@
     }
     .recording-indicator {
       font-weight: bold;
-      color: #d9534f; /* red-ish */
+      color: #d9534f;
     }
     .hidden {
       display: none !important;
@@ -100,6 +98,9 @@
         <a class="nav-link" id="manage-tab" data-bs-toggle="tab" href="#manageModels" role="tab" aria-controls="manageModels" aria-selected="false">Manage Models</a>
       </li>
       <li class="nav-item">
+        <a class="nav-link" id="audiocontrols-tab" data-bs-toggle="tab" href="#audioControls" role="tab" aria-controls="audioControls" aria-selected="false">Audio Controls</a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link" id="server-tab" data-bs-toggle="tab" href="#serverControl" role="tab" aria-controls="serverControl" aria-selected="false">Server Control</a>
       </li>
     </ul>
@@ -114,7 +115,6 @@
                 <h5 class="mb-0">Triton Model Inference</h5>
               </div>
               <div class="card-body">
-
                 <!-- Mic + Normal Query Container -->
                 <form id="model-form">
                   <div class="mb-3">
@@ -158,15 +158,23 @@
                   <p class="mt-2">Processing your request...</p>
                 </div>
 
-                <!-- Response Container -->
-                <div id="response-container" class="mt-4" style="display:none;">
-                  <h6>Response</h6>
-                  <div class="alert alert-secondary" id="response"></div>
-                  <button id="playTTSBtn" class="btn speaker-btn">
-                    <i class="bi bi-volume-up"></i>
+                <!-- Transcription Container -->
+                <div id="whisper-container" class="mt-4" style="display:none;">
+                  <h6>Whisper Transcription</h6>
+                  <div class="alert alert-secondary" id="whisper-transcription"></div>
+                  <button id="playWhisperTTSBtn" class="btn speaker-btn">
+                    <i class="bi bi-volume-up"></i> Play Transcription
                   </button>
                 </div>
 
+                <!-- Response Container -->
+                <div id="response-container" class="mt-4" style="display:none;">
+                  <h6>Model Response</h6>
+                  <div class="alert alert-secondary" id="response"></div>
+                  <button id="playResponseTTSBtn" class="btn speaker-btn">
+                    <i class="bi bi-volume-up"></i> Play Response
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -249,10 +257,41 @@
         </div>
       </div> <!-- end MANAGE MODELS TAB -->
 
+      <!-- AUDIO CONTROLS TAB -->
+      <div class="tab-pane fade" id="audioControls" role="tabpanel" aria-labelledby="audiocontrols-tab">
+        <div class="row justify-content-center g-4 mt-3">
+          <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white text-center">
+                <h5 class="mb-0">Audio Controls</h5>
+              </div>
+              <div class="card-body">
+                <div class="mt-4">
+                  <label for="ttsSpeakerSelect" class="form-label fw-bold">TTS Voice</label>
+                  <select class="form-select" id="ttsSpeakerSelect">
+                    <option value="p230">Cove</option>
+                    <option value="p227">Sol</option>
+                    <option value="p250">Spruce</option>
+                    <option value="p266">Arbor</option>
+                    <option value="p293">Juniper</option>
+                    <option value="p299">Breeze</option>
+                  </select>
+                  <label for="ttsSpeedRange" class="form-label fw-bold mt-3">Playback Speed</label>
+                  <input type="range" class="form-range" id="ttsSpeedRange" min="0.5" max="2" step="0.1" value="1">
+                  <div class="text-center">
+                    <span id="ttsSpeedValue">1.0x</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div> <!-- end AUDIO CONTROLS TAB -->
+
       <!-- SERVER CONTROL TAB -->
       <div class="tab-pane fade" id="serverControl" role="tabpanel" aria-labelledby="server-tab">
         <div class="row justify-content-center g-4 mt-3">
-          <div class="col-md-6">
+          <div class="col-md-8"><!-- Increased width from 6 to 8 -->
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white text-center">
                 <h5 class="mb-0">Triton Server Control</h5>
@@ -289,9 +328,6 @@
   </script>
 
   <script>
-    /********************************************************
-     *  Load Models into <select> helper
-     ********************************************************/
     function loadModelsForDropdown(selector) {
       $.get("/api/list_models", function(data){
         const sel = $(selector);
@@ -305,25 +341,18 @@
       });
     }
 
-    /********************************************************
-     *  Global Variables for Audio Recording
-     ********************************************************/
     let mediaRecorder;
     let audioChunks = [];
 
-    /********************************************************
-     *  Document Ready
-     ********************************************************/
     $(document).ready(function(){
-      // Load models in Home tab & Manage tab
       loadModelsForDropdown("#model");
       loadModelsForDropdown("#delete_model_name");
       loadModelsForDropdown("#code_model_name");
 
-      // ========== HOME: Inference (Text) ==========
       $("#model-form").on("submit", function(e){
         e.preventDefault();
         $("#response-container").hide();
+        $("#whisper-container").hide();
         $("#loader").show();
         $.post("/api/query", $(this).serialize(), function(data){
           $("#loader").hide();
@@ -341,17 +370,15 @@
         });
       });
 
-      // ========== HOME: Inference (Audio) ==========
       $("#startRecordingBtn").click(async function(){
         $("#textQueryContainer").addClass("hidden");
         $("#submitQueryBtn").addClass("hidden");
         $("#recordingUI").removeClass("hidden");
         $("#response-container").hide();
-
+        $("#whisper-container").hide();
         audioChunks = [];
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
-
         mediaRecorder.ondataavailable = (e) => {
           if(e.data.size > 0) {
             audioChunks.push(e.data);
@@ -388,10 +415,14 @@
             contentType: false,
             success: function(data) {
               $("#loader").hide();
+              if(data.transcription){
+                $("#whisper-transcription").text(data.transcription);
+                $("#whisper-container").show();
+              }
               if(data.response){
                 $("#response").text(data.response);
                 $("#response-container").show();
-              } else {
+              } else if(data.error){
                 $("#response").text("Error: " + data.error);
                 $("#response-container").show();
               }
@@ -413,11 +444,12 @@
         $("#recordingUI").addClass("hidden");
       }
 
-      // ========== HOME: Play TTS for Response (Local TTS) ==========
-      $("#playTTSBtn").click(function(){
-        const text = $("#response").text().trim();
+      $("#playWhisperTTSBtn").click(function(){
+        const text = $("#whisper-transcription").text().trim();
         if(!text) return;
-        $.post("/api/tts", { text: text }, function(data){
+        const speaker = $("#ttsSpeakerSelect").val();
+        const speed = $("#ttsSpeedRange").val();
+        $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
           if(data.audio){
             const audio = new Audio("data:audio/wav;base64," + data.audio);
             audio.play();
@@ -427,12 +459,29 @@
         });
       });
 
-      // ========== MANAGE: Add Model ==========
+      $("#playResponseTTSBtn").click(function(){
+        const text = $("#response").text().trim();
+        if(!text) return;
+        const speaker = $("#ttsSpeakerSelect").val();
+        const speed = $("#ttsSpeedRange").val();
+        $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
+          if(data.audio){
+            const audio = new Audio("data:audio/wav;base64," + data.audio);
+            audio.play();
+          }
+        }).fail(function(xhr){
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      $("#ttsSpeedRange").on("input", function(){
+        $("#ttsSpeedValue").text($(this).val() + "x");
+      });
+
       $("#add-model-form").on("submit", function(e){
         e.preventDefault();
         $("#add-model-result").hide();
         $("#usage-code").hide();
-
         $.post("/api/add_model", $(this).serialize(), function(data){
           if(data.error){
             alert("Error: " + data.error);
@@ -449,7 +498,6 @@
         });
       });
 
-      // ========== MANAGE: Delete Model ==========
       $("#delete-model-form").on("submit", function(e){
         e.preventDefault();
         $("#delete-model-result").hide();
@@ -468,7 +516,6 @@
         });
       });
 
-      // ========== MANAGE: Get Client Code ==========
       $("#get-code-form").on("submit", function(e){
         e.preventDefault();
         $("#get-code-result").hide();
@@ -484,7 +531,6 @@
         });
       });
 
-      // ========== SERVER: Start ==========
       $("#start-server").click(function(){
         $("#server-result").hide();
         $("#server-logs-box").hide();
@@ -500,7 +546,6 @@
         });
       });
 
-      // ========== SERVER: Stop ==========
       $("#stop-server").click(function(){
         $("#server-result").hide();
         $("#server-logs-box").hide();
@@ -516,7 +561,6 @@
         });
       });
 
-      // ========== SERVER: Get Logs ==========
       $("#logs-server").click(function(){
         $("#server-result").hide();
         $.get("/api/get_server_logs", function(data){
