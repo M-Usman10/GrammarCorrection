@@ -349,6 +349,7 @@
       loadModelsForDropdown("#delete_model_name");
       loadModelsForDropdown("#code_model_name");
 
+      // Handle normal text-based query
       $("#model-form").on("submit", function(e){
         e.preventDefault();
         $("#response-container").hide();
@@ -370,6 +371,7 @@
         });
       });
 
+      // UPDATED: Wrap getUserMedia in try/catch to handle errors
       $("#startRecordingBtn").click(async function(){
         $("#textQueryContainer").addClass("hidden");
         $("#submitQueryBtn").addClass("hidden");
@@ -377,14 +379,23 @@
         $("#response-container").hide();
         $("#whisper-container").hide();
         audioChunks = [];
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
-        mediaRecorder.ondataavailable = (e) => {
-          if(e.data.size > 0) {
-            audioChunks.push(e.data);
-          }
-        };
-        mediaRecorder.start();
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
+          mediaRecorder.ondataavailable = (e) => {
+            if(e.data.size > 0) {
+              audioChunks.push(e.data);
+            }
+          };
+          mediaRecorder.start();
+        } catch (err) {
+          // Show an error message on the UI if recording cannot start
+          $("#recordingUI").addClass("hidden");
+          $("#response").text("Error: Unable to start recording. " + err.message);
+          $("#response-container").show();
+          resetRecordingUI();
+        }
       });
 
       $("#cancelRecordingBtn").click(function(){
@@ -394,10 +405,12 @@
         resetRecordingUI();
       });
 
+      // Confirm recording and send to server
       $("#confirmRecordingBtn").click(async function(){
         if(mediaRecorder && mediaRecorder.state !== 'inactive'){
           mediaRecorder.stop();
         }
+
         mediaRecorder.onstop = async () => {
           $("#loader").show();
           $("#recordingUI").addClass("hidden");
@@ -478,6 +491,7 @@
         $("#ttsSpeedValue").text($(this).val() + "x");
       });
 
+      // Add Model
       $("#add-model-form").on("submit", function(e){
         e.preventDefault();
         $("#add-model-result").hide();
@@ -498,6 +512,7 @@
         });
       });
 
+      // Delete Model
       $("#delete-model-form").on("submit", function(e){
         e.preventDefault();
         $("#delete-model-result").hide();
@@ -516,6 +531,7 @@
         });
       });
 
+      // Get Client Code
       $("#get-code-form").on("submit", function(e){
         e.preventDefault();
         $("#get-code-result").hide();
@@ -531,6 +547,7 @@
         });
       });
 
+      // Server start, stop, logs
       $("#start-server").click(function(){
         $("#server-result").hide();
         $("#server-logs-box").hide();
