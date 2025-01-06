@@ -8,6 +8,8 @@ import librosa
 from flask import Flask, render_template, request, jsonify
 from tritonclient.http import InferenceServerClient, InferInput
 from TTS.api import TTS
+import os
+import subprocess
 
 from utils import (
     list_models,
@@ -22,6 +24,10 @@ from utils import (
 app = Flask(__name__)
 
 TRITON_SERVER_URL = "localhost:8000"
+
+# Start Ollama server
+if not subprocess.run(["pgrep", "-f", "ollama serve"], stdout=subprocess.DEVNULL).returncode == 0:
+    subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def infer_model(model_name, input_text):
     client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=1000)
