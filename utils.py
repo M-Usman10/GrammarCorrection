@@ -162,7 +162,11 @@ def delete_model(model_folder_name, models_dir="./models"):
         shutil.rmtree(path)
 
 # ------------------- Triton Server Management -------------------
+
 def get_container_status(container_name):
+    """
+    Return the Docker container's state string if it's running, otherwise ''.
+    """
     try:
         output = subprocess.check_output([
             "docker", "ps", "--filter", f"name={container_name}",
@@ -177,6 +181,21 @@ def get_container_status(container_name):
     except FileNotFoundError:
         return ""
 
+def kill_triton_server():
+    """
+    Forcefully kill the Triton Docker container if it's running.
+    Returns True if killed successfully or was not running, False otherwise.
+    """
+    status = get_container_status(TRITON_CONTAINER_NAME)
+    if status == "running":
+        try:
+            subprocess.check_output(["docker", "kill", TRITON_CONTAINER_NAME])
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Error killing container: {e.output.decode('utf-8')}")
+            return False
+    return True
+
 def start_triton_server():
     """
     Start the Triton server with environment variables from .env,
@@ -184,9 +203,9 @@ def start_triton_server():
     Returns (success: bool, msg: str, logs: str or None).
     If success == False, we also provide logs for direct display in the UI.
     """
-    status = get_container_status(TRITON_CONTAINER_NAME)
-    if status == "running":
-        return True, "Triton server is already running.", None
+    # Ensure no existing container is running
+    if not kill_triton_server():
+        return False, "Failed to kill existing Triton server container.", None
 
     env_vars = load_env_vars(".env")  # dict of {KEY: VAL}
     cmd = [
@@ -214,8 +233,6 @@ def start_triton_server():
             return True, "Triton server started successfully.", None
         else:
             # If not running, fetch logs
-            # The container may still exist even if not 'running' (it might be in 'exited' state).
-            # We'll run `docker logs` to capture the logs.
             try:
                 logs = subprocess.check_output(
                     ["docker", "logs", TRITON_CONTAINER_NAME],
@@ -223,7 +240,6 @@ def start_triton_server():
                 ).decode('utf-8', errors='replace')
             except Exception as e:
                 logs = f"Error retrieving logs: {e}"
-
             return False, "Failed to start Triton server.", logs
     except Exception as e:
         return False, str(e), None

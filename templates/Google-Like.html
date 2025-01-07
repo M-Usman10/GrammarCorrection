@@ -268,14 +268,33 @@
               <div class="card-body">
                 <div class="mt-4">
                   <label for="ttsSpeakerSelect" class="form-label fw-bold">TTS Voice</label>
-                  <select class="form-select" id="ttsSpeakerSelect">
-                    <option value="p230">Cove</option>
-                    <option value="p227">Sol</option>
-                    <option value="p250">Spruce</option>
-                    <option value="p266">Arbor</option>
-                    <option value="p293">Juniper</option>
-                    <option value="p299">Breeze</option>
-                  </select>
+                    <select class="form-select" id="ttsSpeakerSelect">
+                      <!-- Female Voices -->
+                      <optgroup label="Female Voices">
+                        <option value="p240">Dawn</option>
+                        <option value="p244">Ember</option>
+                        <option value="p245">Willow</option>
+                        <option value="p246">Rose</option>
+                        <option value="p247">Star</option>
+                        <option value="p268">Aura</option>
+                        <option value="p294">Juniper</option>
+                        <option value="p306">Breeze</option>
+                        <option value="p308">Nova</option>
+                        <option value="p316">Echo</option>
+                      </optgroup>
+                      <!-- Male Voices -->
+                      <optgroup label="Male Voices">
+                        <option value="p230">Cove</option>
+                        <option value="p233">Sol</option>
+                        <option value="p251">Spruce</option>
+                        <option value="p286">Arbor</option>
+                        <option value="p287">Ash</option>
+                        <option value="p302">Slate</option>
+                        <option value="p307">Drift</option>
+                        <option value="p312">River</option>
+                        <option value="p317">Orion</option>
+                      </optgroup>
+                    </select>
                   <label for="ttsSpeedRange" class="form-label fw-bold mt-3">Playback Speed</label>
                   <input type="range" class="form-range" id="ttsSpeedRange" min="0.5" max="2" step="0.1" value="1">
                   <div class="text-center">
