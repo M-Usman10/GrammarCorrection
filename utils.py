@@ -210,7 +210,7 @@ def start_triton_server():
     env_vars = load_env_vars(".env")  # dict of {KEY: VAL}
     cmd = [
         "docker", "run",
-        # Removed --rm so we can fetch logs on failure
+        "--rm",
         "--name", TRITON_CONTAINER_NAME,
         "-p", "8000:8000",
         "-v", f"{os.getcwd()}/models:/models",
