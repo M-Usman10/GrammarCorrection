@@ -15,6 +15,8 @@ def load_env_vars(env_file=".env"):
     Returns a dict of {VAR_NAME: value}.
     """
     if os.path.exists(env_file):
+        # dotenv_values does NOT expand 'export' or quotes,
+        # but it does parse KEY=VAL lines. We'll do minimal cleansing:
         env_map = {}
         raw_dict = dotenv_values(env_file)
         for k, v in raw_dict.items():
@@ -63,6 +65,7 @@ def create_model(raw_model_name: str, models_dir="./models"):
 
     os.makedirs(version_path, exist_ok=True)
 
+    # model.py keeps the original name with ':'
     model_py_content = f'''\
 """
 model.py for {raw_model_name} using aisuite.
@@ -126,6 +129,7 @@ class TritonPythonModel:
         return responses
 '''
 
+    # config.pbtxt uses sanitized name
     config_content = f'''\
 name: "{safe_name}"
 backend: "python"
@@ -181,17 +185,14 @@ def start_triton_server():
     """
     Start the Triton server with environment variables from .env,
     passing them via -e KEY=VALUE to docker.
-    Returns (success: bool, msg: str, logs: str or None).
-    If success == False, we also provide logs for direct display in the UI.
     """
     status = get_container_status(TRITON_CONTAINER_NAME)
     if status == "running":
-        return True, "Triton server is already running.", None
+        return True, "Triton server is already running."
 
     env_vars = load_env_vars(".env")  # dict of {KEY: VAL}
     cmd = [
-        "docker", "run",
-        # Removed --rm so we can fetch logs on failure
+        "docker", "run", "--rm",
         "--name", TRITON_CONTAINER_NAME,
         "-p", "8000:8000",
         "-v", f"{os.getcwd()}/models:/models",
@@ -208,30 +209,19 @@ def start_triton_server():
     ])
 
     try:
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        time.sleep(2)  # Let container attempt to start
+        # Pipe the logs so we can capture them if we want
+        subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        time.sleep(2)  # let container start
         if get_container_status(TRITON_CONTAINER_NAME) == "running":
-            return True, "Triton server started successfully.", None
+            return True, "Triton server started successfully."
         else:
-            # If not running, fetch logs
-            # The container may still exist even if not 'running' (it might be in 'exited' state).
-            # We'll run `docker logs` to capture the logs.
-            try:
-                logs = subprocess.check_output(
-                    ["docker", "logs", TRITON_CONTAINER_NAME],
-                    stderr=subprocess.STDOUT
-                ).decode('utf-8', errors='replace')
-            except Exception as e:
-                logs = f"Error retrieving logs: {e}"
-
-            return False, "Failed to start Triton server.", logs
+            return False, "Failed to start Triton server. Check Docker logs."
     except Exception as e:
-        return False, str(e), None
+        return False, str(e)
 
 def stop_triton_server():
     """
     Stop the Docker container if running.
-    Returns (success, message).
     """
     status = get_container_status(TRITON_CONTAINER_NAME)
     if status == "running":
@@ -251,6 +241,8 @@ def get_triton_logs():
     status = get_container_status(TRITON_CONTAINER_NAME)
     if status == "running":
         try:
+            # Retrieve all logs since container started
+            # You can also adjust --tail to a large number if needed
             logs = subprocess.check_output([
                 "docker", "logs", "--since=0",
                 TRITON_CONTAINER_NAME
