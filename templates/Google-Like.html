@@ -140,6 +140,9 @@
                 <!-- Recording UI (hidden initially) -->
                 <div id="recordingUI" class="mt-4 hidden text-center">
                   <p class="recording-indicator">Recording...</p>
+                  <!-- ADDED: Timer element -->
+                  <p id="record-timer" style="font-size: 1.2rem; margin-bottom: 1rem;">00:00</p>
+
                   <div class="d-flex justify-content-center gap-3">
                     <button id="cancelRecordingBtn" class="btn btn-secondary">
                       <i class="bi bi-x-lg"></i>
@@ -363,6 +366,30 @@
     let mediaRecorder;
     let audioChunks = [];
 
+    // Timer-related variables
+    let recordInterval;     // will hold our setInterval reference
+    let recordStartTime;    // to store the timestamp when recording starts
+
+    // Start the timer
+    function startRecordingTimer() {
+      recordStartTime = Date.now();
+      recordInterval = setInterval(function() {
+        const elapsedMs = Date.now() - recordStartTime;
+        const totalSeconds = Math.floor(elapsedMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        // format as mm:ss
+        const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        document.getElementById("record-timer").textContent = timeStr;
+      }, 1000);
+    }
+
+    // Stop the timer and reset to 00:00
+    function stopRecordingTimer() {
+      clearInterval(recordInterval);
+      document.getElementById("record-timer").textContent = "00:00";
+    }
+
     $(document).ready(function(){
       loadModelsForDropdown("#model");
       loadModelsForDropdown("#delete_model_name");
@@ -390,7 +417,7 @@
         });
       });
 
-      // Wrap getUserMedia in try/catch to handle errors
+      // Start recording
       $("#startRecordingBtn").click(async function(){
         $("#textQueryContainer").addClass("hidden");
         $("#submitQueryBtn").addClass("hidden");
@@ -408,6 +435,10 @@
             }
           };
           mediaRecorder.start();
+
+          // Start the timer once the recording is confirmed to start
+          startRecordingTimer();
+
         } catch (err) {
           // Show an error message on the UI if recording cannot start
           $("#recordingUI").addClass("hidden");
@@ -417,10 +448,12 @@
         }
       });
 
+      // Cancel recording
       $("#cancelRecordingBtn").click(function(){
         if(mediaRecorder && mediaRecorder.state !== 'inactive'){
           mediaRecorder.stop();
         }
+        stopRecordingTimer();  // stop & reset the timer
         resetRecordingUI();
       });
 
@@ -430,9 +463,13 @@
           mediaRecorder.stop();
         }
 
+        // Once recording stops, handle sending audio
         mediaRecorder.onstop = async () => {
           $("#loader").show();
           $("#recordingUI").addClass("hidden");
+
+          // Stop & reset the timer
+          stopRecordingTimer();
 
           const blob = new Blob(audioChunks, { type: 'audio/webm; codecs=opus' });
           const formData = new FormData();
@@ -476,6 +513,7 @@
         $("#recordingUI").addClass("hidden");
       }
 
+      // Play TTS for Whisper Transcription
       $("#playWhisperTTSBtn").click(function(){
         const text = $("#whisper-transcription").text().trim();
         if(!text) return;
@@ -491,6 +529,7 @@
         });
       });
 
+      // Play TTS for Model Response
       $("#playResponseTTSBtn").click(function(){
         const text = $("#response").text().trim();
         if(!text) return;
@@ -506,6 +545,7 @@
         });
       });
 
+      // Update TTS speed label
       $("#ttsSpeedRange").on("input", function(){
         $("#ttsSpeedValue").text($(this).val() + "x");
       });
