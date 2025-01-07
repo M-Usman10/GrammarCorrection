@@ -371,7 +371,7 @@
         });
       });
 
-      // UPDATED: Wrap getUserMedia in try/catch to handle errors
+      // Wrap getUserMedia in try/catch to handle errors
       $("#startRecordingBtn").click(async function(){
         $("#textQueryContainer").addClass("hidden");
         $("#submitQueryBtn").addClass("hidden");
@@ -553,7 +553,12 @@
         $("#server-logs-box").hide();
         $.post("/api/start_server", {}, function(data){
           if(data.error){
-            alert("Error: " + data.error);
+            // Display error + logs in the UI
+            $("#server-message").text(data.error);
+            if(data.logs){
+              $("#server-logs-box").text(data.logs).show();
+            }
+            $("#server-result").show();
           } else {
             $("#server-message").text(data.message);
             $("#server-result").show();

@@ -240,10 +240,10 @@ print("Model Response:", model_result)
 
 @app.route('/api/start_server', methods=['POST'])
 def api_start_server():
-    success, msg = start_triton_server()
+    success, msg, logs = start_triton_server()
     if success:
         return jsonify({'status': 'success', 'message': msg})
-    return jsonify({'error': msg}), 500
+    return jsonify({'error': msg, 'logs': logs}), 500
 
 @app.route('/api/stop_server', methods=['POST'])
 def api_stop_server():
