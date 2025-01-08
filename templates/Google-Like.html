@@ -139,8 +139,10 @@
 
                 <!-- Recording UI (hidden initially) -->
                 <div id="recordingUI" class="mt-4 hidden text-center">
-                  <p class="recording-indicator">Recording...</p>
-                  <!-- ADDED: Timer element -->
+                  <!-- We show the "Recording..." inside onstart event -->
+                  <p class="recording-indicator" id="recordingIndicator" style="display:none;">Recording...</p>
+
+                  <!-- Timer element -->
                   <p id="record-timer" style="font-size: 1.2rem; margin-bottom: 1rem;">00:00</p>
 
                   <div class="d-flex justify-content-center gap-3">
@@ -161,13 +163,16 @@
                   <p class="mt-2">Processing your request...</p>
                 </div>
 
-                <!-- Transcription Container -->
+                <!-- Editable Transcription Container -->
                 <div id="whisper-container" class="mt-4" style="display:none;">
                   <h6>Whisper Transcription</h6>
-                  <div class="alert alert-secondary" id="whisper-transcription"></div>
-                  <button id="playWhisperTTSBtn" class="btn speaker-btn">
-                    <i class="bi bi-volume-up"></i> Play Transcription
-                  </button>
+                  <textarea class="form-control" id="whisper-transcription-editable" rows="3"></textarea>
+                  <div class="mt-2 d-flex justify-content-end gap-2">
+                    <button id="whisperInferenceBtn" class="btn btn-primary">Submit for Inference</button>
+                    <button id="playWhisperTTSBtn" class="btn speaker-btn">
+                      <i class="bi bi-volume-up"></i> Play (Whisper TTS)
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Response Container -->
@@ -175,7 +180,7 @@
                   <h6>Model Response</h6>
                   <div class="alert alert-secondary" id="response"></div>
                   <button id="playResponseTTSBtn" class="btn speaker-btn">
-                    <i class="bi bi-volume-up"></i> Play Response
+                    <i class="bi bi-volume-up"></i> Play (Model TTS)
                   </button>
                 </div>
               </div>
@@ -269,39 +274,83 @@
                 <h5 class="mb-0">Audio Controls</h5>
               </div>
               <div class="card-body">
-                <div class="mt-4">
-                  <label for="ttsSpeakerSelect" class="form-label fw-bold">TTS Voice</label>
-                    <select class="form-select" id="ttsSpeakerSelect">
-                      <!-- Female Voices -->
-                      <optgroup label="Female Voices">
-                        <option value="p240">Dawn</option>
-                        <option value="p244">Ember</option>
-                        <option value="p245">Willow</option>
-                        <option value="p246">Rose</option>
-                        <option value="p247">Star</option>
-                        <option value="p268">Aura</option>
-                        <option value="p294">Juniper</option>
-                        <option value="p306">Breeze</option>
-                        <option value="p308">Nova</option>
-                        <option value="p316">Echo</option>
-                      </optgroup>
-                      <!-- Male Voices -->
-                      <optgroup label="Male Voices">
-                        <option value="p230">Cove</option>
-                        <option value="p233">Sol</option>
-                        <option value="p251">Spruce</option>
-                        <option value="p286">Arbor</option>
-                        <option value="p287">Ash</option>
-                        <option value="p302">Slate</option>
-                        <option value="p307">Drift</option>
-                        <option value="p312">River</option>
-                        <option value="p317">Orion</option>
-                      </optgroup>
-                    </select>
-                  <label for="ttsSpeedRange" class="form-label fw-bold mt-3">Playback Speed</label>
-                  <input type="range" class="form-range" id="ttsSpeedRange" min="0.5" max="2" step="0.1" value="1">
+                <!-- Whisper TTS controls -->
+                <h6 class="fw-bold">Whisper TTS Settings</h6>
+                <div class="mb-3">
+                  <label for="whisperTtsSpeakerSelect" class="form-label">Voice</label>
+                  <select class="form-select" id="whisperTtsSpeakerSelect">
+                    <!-- Female Voices -->
+                    <optgroup label="Female Voices">
+                      <option value="p240">Dawn</option>
+                      <option value="p244">Ember</option>
+                      <option value="p245">Willow</option>
+                      <option value="p246">Rose</option>
+                      <option value="p247">Star</option>
+                      <option value="p268">Aura</option>
+                      <option value="p294">Juniper</option>
+                      <option value="p306">Breeze</option>
+                      <option value="p308">Nova</option>
+                      <option value="p316">Echo</option>
+                    </optgroup>
+                    <!-- Male Voices -->
+                    <optgroup label="Male Voices">
+                      <option value="p230">Cove</option>
+                      <option value="p233">Sol</option>
+                      <option value="p251">Spruce</option>
+                      <option value="p286">Arbor</option>
+                      <option value="p287">Ash</option>
+                      <option value="p302">Slate</option>
+                      <option value="p307">Drift</option>
+                      <option value="p312">River</option>
+                      <option value="p317">Orion</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label for="whisperTtsSpeedRange" class="form-label">Playback Speed</label>
+                  <input type="range" class="form-range" id="whisperTtsSpeedRange" min="0.5" max="2" step="0.1" value="1">
                   <div class="text-center">
-                    <span id="ttsSpeedValue">1.0x</span>
+                    <span id="whisperTtsSpeedValue">1.0x</span>
+                  </div>
+                </div>
+                <hr/>
+                <!-- Model TTS controls -->
+                <h6 class="fw-bold">Model TTS Settings</h6>
+                <div class="mb-3">
+                  <label for="modelTtsSpeakerSelect" class="form-label">Voice</label>
+                  <select class="form-select" id="modelTtsSpeakerSelect">
+                    <!-- Female Voices -->
+                    <optgroup label="Female Voices">
+                      <option value="p240">Dawn</option>
+                      <option value="p244">Ember</option>
+                      <option value="p245">Willow</option>
+                      <option value="p246">Rose</option>
+                      <option value="p247">Star</option>
+                      <option value="p268">Aura</option>
+                      <option value="p294">Juniper</option>
+                      <option value="p306">Breeze</option>
+                      <option value="p308">Nova</option>
+                      <option value="p316">Echo</option>
+                    </optgroup>
+                    <!-- Male Voices -->
+                    <optgroup label="Male Voices">
+                      <option value="p230">Cove</option>
+                      <option value="p233">Sol</option>
+                      <option value="p251">Spruce</option>
+                      <option value="p286">Arbor</option>
+                      <option value="p287">Ash</option>
+                      <option value="p302">Slate</option>
+                      <option value="p307">Drift</option>
+                      <option value="p312">River</option>
+                      <option value="p317">Orion</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label for="modelTtsSpeedRange" class="form-label">Playback Speed</label>
+                  <input type="range" class="form-range" id="modelTtsSpeedRange" min="0.5" max="2" step="0.1" value="1">
+                  <div class="text-center">
+                    <span id="modelTtsSpeedValue">1.0x</span>
                   </div>
                 </div>
               </div>
@@ -313,7 +362,7 @@
       <!-- SERVER CONTROL TAB -->
       <div class="tab-pane fade" id="serverControl" role="tabpanel" aria-labelledby="server-tab">
         <div class="row justify-content-center g-4 mt-3">
-          <div class="col-md-8"><!-- Increased width from 6 to 8 -->
+          <div class="col-md-8">
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white text-center">
                 <h5 class="mb-0">Triton Server Control</h5>
@@ -367,8 +416,8 @@
     let audioChunks = [];
 
     // Timer-related variables
-    let recordInterval;     // will hold our setInterval reference
-    let recordStartTime;    // to store the timestamp when recording starts
+    let recordInterval;
+    let recordStartTime;
 
     // Start the timer
     function startRecordingTimer() {
@@ -378,7 +427,6 @@
         const totalSeconds = Math.floor(elapsedMs / 1000);
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
-        // format as mm:ss
         const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
         document.getElementById("record-timer").textContent = timeStr;
       }, 1000);
@@ -394,6 +442,24 @@
       loadModelsForDropdown("#model");
       loadModelsForDropdown("#delete_model_name");
       loadModelsForDropdown("#code_model_name");
+
+      /**********************************************
+       * SHIFT+Enter for new line, Enter for submit *
+       **********************************************/
+      // For the normal query area:
+      $("#query").keydown(function(e){
+        if(e.keyCode === 13 && !e.shiftKey) {
+          e.preventDefault();
+          $("#model-form").submit();
+        }
+      });
+      // For the transcribed text area:
+      $("#whisper-transcription-editable").keydown(function(e){
+        if(e.keyCode === 13 && !e.shiftKey) {
+          e.preventDefault();
+          $("#whisperInferenceBtn").click();
+        }
+      });
 
       // Handle normal text-based query
       $("#model-form").on("submit", function(e){
@@ -419,6 +485,7 @@
 
       // Start recording
       $("#startRecordingBtn").click(async function(){
+        // Hide text query fields while recording
         $("#textQueryContainer").addClass("hidden");
         $("#submitQueryBtn").addClass("hidden");
         $("#recordingUI").removeClass("hidden");
@@ -429,15 +496,19 @@
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
+
+          // show "Recording..." only once recording has really started
+          mediaRecorder.onstart = function() {
+            $("#recordingIndicator").show();
+            startRecordingTimer();
+          };
+          // gather chunks
           mediaRecorder.ondataavailable = (e) => {
             if(e.data.size > 0) {
               audioChunks.push(e.data);
             }
           };
           mediaRecorder.start();
-
-          // Start the timer once the recording is confirmed to start
-          startRecordingTimer();
 
         } catch (err) {
           // Show an error message on the UI if recording cannot start
@@ -453,31 +524,29 @@
         if(mediaRecorder && mediaRecorder.state !== 'inactive'){
           mediaRecorder.stop();
         }
-        stopRecordingTimer();  // stop & reset the timer
+        stopRecordingTimer();
+        $("#recordingIndicator").hide();
         resetRecordingUI();
       });
 
-      // Confirm recording and send to server
+      // Confirm recording => call /api/transcribe
       $("#confirmRecordingBtn").click(async function(){
         if(mediaRecorder && mediaRecorder.state !== 'inactive'){
           mediaRecorder.stop();
         }
-
         // Once recording stops, handle sending audio
         mediaRecorder.onstop = async () => {
           $("#loader").show();
           $("#recordingUI").addClass("hidden");
-
-          // Stop & reset the timer
+          $("#recordingIndicator").hide();
           stopRecordingTimer();
 
           const blob = new Blob(audioChunks, { type: 'audio/webm; codecs=opus' });
           const formData = new FormData();
           formData.append('audio_data', blob, 'recording.webm');
-          formData.append('model', $("#model").val());
 
           $.ajax({
-            url: "/api/transcribe_and_infer",
+            url: "/api/transcribe",
             method: "POST",
             data: formData,
             processData: false,
@@ -485,12 +554,8 @@
             success: function(data) {
               $("#loader").hide();
               if(data.transcription){
-                $("#whisper-transcription").text(data.transcription);
+                $("#whisper-transcription-editable").val(data.transcription);
                 $("#whisper-container").show();
-              }
-              if(data.response){
-                $("#response").text(data.response);
-                $("#response-container").show();
               } else if(data.error){
                 $("#response").text("Error: " + data.error);
                 $("#response-container").show();
@@ -507,6 +572,38 @@
         };
       });
 
+      // Button to do inference from the current whisper text
+      $("#whisperInferenceBtn").click(function(){
+        const input_text = $("#whisper-transcription-editable").val().trim();
+        const model = $("#model").val();
+        if(!model) {
+          alert("Please select a model first.");
+          return;
+        }
+        if(!input_text) {
+          alert("No text to infer. Please transcribe or type something.");
+          return;
+        }
+        $("#loader").show();
+        $("#response-container").hide();
+
+        $.post("/api/query", {model: model, query: input_text}, function(data){
+          $("#loader").hide();
+          if(data.response){
+            $("#response").text(data.response);
+            $("#response-container").show();
+          } else {
+            $("#response").text("Error: " + data.error);
+            $("#response-container").show();
+          }
+        }).fail(function(xhr){
+          $("#loader").hide();
+          $("#response").text("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          $("#response-container").show();
+        });
+      });
+
+      // reset UI after any record attempt finishes
       function resetRecordingUI() {
         $("#textQueryContainer").removeClass("hidden");
         $("#submitQueryBtn").removeClass("hidden");
@@ -515,10 +612,10 @@
 
       // Play TTS for Whisper Transcription
       $("#playWhisperTTSBtn").click(function(){
-        const text = $("#whisper-transcription").text().trim();
+        const text = $("#whisper-transcription-editable").val().trim();
         if(!text) return;
-        const speaker = $("#ttsSpeakerSelect").val();
-        const speed = $("#ttsSpeedRange").val();
+        const speaker = $("#whisperTtsSpeakerSelect").val();
+        const speed = $("#whisperTtsSpeedRange").val();
         $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
           if(data.audio){
             const audio = new Audio("data:audio/wav;base64," + data.audio);
@@ -533,8 +630,8 @@
       $("#playResponseTTSBtn").click(function(){
         const text = $("#response").text().trim();
         if(!text) return;
-        const speaker = $("#ttsSpeakerSelect").val();
-        const speed = $("#ttsSpeedRange").val();
+        const speaker = $("#modelTtsSpeakerSelect").val();
+        const speed = $("#modelTtsSpeedRange").val();
         $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
           if(data.audio){
             const audio = new Audio("data:audio/wav;base64," + data.audio);
@@ -545,9 +642,12 @@
         });
       });
 
-      // Update TTS speed label
-      $("#ttsSpeedRange").on("input", function(){
-        $("#ttsSpeedValue").text($(this).val() + "x");
+      // Update TTS speed labels
+      $("#whisperTtsSpeedRange").on("input", function(){
+        $("#whisperTtsSpeedValue").text($(this).val() + "x");
+      });
+      $("#modelTtsSpeedRange").on("input", function(){
+        $("#modelTtsSpeedValue").text($(this).val() + "x");
       });
 
       // Add Model
@@ -612,7 +712,6 @@
         $("#server-logs-box").hide();
         $.post("/api/start_server", {}, function(data){
           if(data.error){
-            // Display error + logs in the UI
             $("#server-message").text(data.error);
             if(data.logs){
               $("#server-logs-box").text(data.logs).show();

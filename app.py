@@ -8,8 +8,6 @@ import librosa
 from flask import Flask, render_template, request, jsonify
 from tritonclient.http import InferenceServerClient, InferInput
 from TTS.api import TTS
-import os
-import subprocess
 
 from utils import (
     list_models,
@@ -25,11 +23,14 @@ app = Flask(__name__)
 
 TRITON_SERVER_URL = "localhost:8000"
 
-# Start Ollama server
+# Start Ollama server if not already running
 if not subprocess.run(["pgrep", "-f", "ollama serve"], stdout=subprocess.DEVNULL).returncode == 0:
     subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def infer_model(model_name, input_text):
+    """
+    Send the given input_text to the selected model on Triton.
+    """
     client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=1000)
     if model_name == "deep-learning-analytics-Grammar-Correction-T5":
         inputs = [InferInput("DUMMY_INPUT", [1, 1, 1], "BYTES")]
@@ -41,6 +42,10 @@ def infer_model(model_name, input_text):
     return response.as_numpy("OUTPUT")
 
 def transcribe_whisper_webm(webm_bytes):
+    """
+    Convert WebM bytes to a WAV, then send to the 'whisper' model on Triton
+    for transcription. Return the text transcription.
+    """
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_input:
         temp_input.write(webm_bytes)
         temp_input.flush()
@@ -91,6 +96,9 @@ def api_list_models():
 
 @app.route('/api/query', methods=['POST'])
 def query_model():
+    """
+    Model inference for user-provided text.
+    """
     model_name = request.form.get('model', '').strip()
     input_text = request.form.get('query', '')
     try:
@@ -103,9 +111,11 @@ def query_model():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-@app.route('/api/transcribe_and_infer', methods=['POST'])
-def transcribe_and_infer():
-    model_name = request.form.get('model', '').strip()
+@app.route('/api/transcribe', methods=['POST'])
+def transcribe_audio():
+    """
+    Transcribe audio only. Returns the whisper text without any model inference.
+    """
     file = request.files.get('audio_data')
     if not file:
         return jsonify({'error': 'No audio file received.'}), 400
@@ -113,20 +123,15 @@ def transcribe_and_infer():
     try:
         webm_bytes = file.read()
         transcription_text = transcribe_whisper_webm(webm_bytes)
-        if model_name:
-            output = infer_model(model_name, transcription_text)
-            if output.size > 0:
-                final_text = output[0].decode('utf-8')
-            else:
-                final_text = ""
-            return jsonify({'transcription': transcription_text, 'response': final_text})
-        else:
-            return jsonify({'transcription': transcription_text, 'response': transcription_text})
+        return jsonify({'transcription': transcription_text})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tts', methods=['POST'])
 def tts_endpoint():
+    """
+    Convert given text to speech using TTS, with chosen speaker and speed.
+    """
     text = request.form.get('text', '')
     speaker = request.form.get('speaker', 'p229')
     speed_str = request.form.get('speed', '1.0')
@@ -146,6 +151,7 @@ def tts_endpoint():
         local_tts = TTS(model_name="tts_models/en/vctk/vits")
         local_tts.tts_to_file(text=text, file_path=tmp_path, speaker=speaker)
 
+        # Adjust speed via ffmpeg if needed
         if abs(speed - 1.0) > 1e-5:
             tmp_output_path = tmp_path + '.speed.wav'
             cmd = [
