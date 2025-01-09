@@ -5,46 +5,48 @@ import subprocess
 import base64
 import numpy as np
 import librosa
+
 from flask import Flask, render_template, request, jsonify
 from tritonclient.http import InferenceServerClient, InferInput
 from TTS.api import TTS
 
-from utils import (
-    list_models,
-    create_model,
-    delete_model,
-    start_triton_server,
-    stop_triton_server,
-    get_triton_logs,
+# Import our new utils modules
+from utils.triton_server_utils import (
+    start_triton_server, stop_triton_server, get_triton_logs
+)
+from utils.model_utils import (
+    list_models, create_model, delete_model,
     sanitize_model_name
 )
+from utils.database_utils import MongoDBClient
 
 app = Flask(__name__)
 
 TRITON_SERVER_URL = "localhost:8000"
 
-# Start Ollama server if not already running
+# Start Ollama server if not running (same logic as before)
 if not subprocess.run(["pgrep", "-f", "ollama serve"], stdout=subprocess.DEVNULL).returncode == 0:
     subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+# Create a global MongoDB client
+mongo_client = MongoDBClient()
+
 def infer_model(model_name, input_text):
-    """
-    Send the given input_text to the selected model on Triton.
-    """
     client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=1000)
+    # Example special-casing for T5
     if model_name == "deep-learning-analytics-Grammar-Correction-T5":
         inputs = [InferInput("DUMMY_INPUT", [1, 1, 1], "BYTES")]
         inputs[0].set_data_from_numpy(np.array([[[input_text]]], dtype=object))
     else:
         inputs = [InferInput("INPUT", [1, 1], "BYTES")]
         inputs[0].set_data_from_numpy(np.array([[input_text]], dtype=object))
+
     response = client.infer(model_name, inputs)
     return response.as_numpy("OUTPUT")
 
-def transcribe_whisper_webm(webm_bytes):
+def convert_webm_to_wav(webm_bytes) -> bytes:
     """
-    Convert WebM bytes to a WAV, then send to the 'whisper' model on Triton
-    for transcription. Return the text transcription.
+    Convert in-memory WebM bytes to WAV bytes, returning the WAV content.
     """
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_input:
         temp_input.write(webm_bytes)
@@ -62,18 +64,31 @@ def transcribe_whisper_webm(webm_bytes):
     try:
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
-        if os.path.exists(temp_webm_path):
-            os.remove(temp_webm_path)
         raise RuntimeError(f"FFmpeg conversion failed: {e}")
-
-    try:
-        audio_data, _ = librosa.load(temp_wav_path, sr=16000, mono=True)
-        audio_data = audio_data.astype(np.float32)
     finally:
         if os.path.exists(temp_webm_path):
             os.remove(temp_webm_path)
-        if os.path.exists(temp_wav_path):
-            os.remove(temp_wav_path)
+
+    with open(temp_wav_path, "rb") as f:
+        wav_bytes = f.read()
+    os.remove(temp_wav_path)
+    return wav_bytes
+
+def transcribe_whisper(wav_bytes: bytes):
+    """
+    Send WAV bytes to the 'whisper' model on Triton to get transcription text.
+    """
+    # Load audio data with librosa for the model input
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp.write(wav_bytes)
+        tmp.flush()
+        temp_path = tmp.name
+
+    audio_data, _ = librosa.load(temp_path, sr=16000, mono=True)
+    audio_data = audio_data.astype(np.float32)
+
+    # Remove the temp file
+    os.remove(temp_path)
 
     client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=500)
     inputs = [InferInput("AUDIO_INPUT", [len(audio_data)], "FP32")]
@@ -98,15 +113,23 @@ def api_list_models():
 def query_model():
     """
     Model inference for user-provided text.
+    We also store the successful interaction in DB if no error.
     """
     model_name = request.form.get('model', '').strip()
     input_text = request.form.get('query', '')
     try:
         output = infer_model(model_name, input_text)
-        if output.size > 0:
-            decoded = output[0].decode('utf-8')
-        else:
-            decoded = ""
+        decoded = output[0].decode('utf-8') if output.size > 0 else ""
+
+        # Store in DB (text-based record):
+        mongo_client.store_interaction(
+            interaction_type="text-to-text",
+            input_data=input_text,
+            output_data=decoded,
+            model_name=model_name,
+            metadata={"info": "query endpoint"}
+        )
+
         return jsonify({'response': decoded})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -114,7 +137,8 @@ def query_model():
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
     """
-    Transcribe audio only. Returns the whisper text without any model inference.
+    Accepts 'audio_data' in WebM format, converts to WAV,
+    stores the WAV in DB, transcribes via Whisper, stores record in DB.
     """
     file = request.files.get('audio_data')
     if not file:
@@ -122,7 +146,27 @@ def transcribe_audio():
 
     try:
         webm_bytes = file.read()
-        transcription_text = transcribe_whisper_webm(webm_bytes)
+        wav_bytes = convert_webm_to_wav(webm_bytes)
+
+        # Store WAV in DB (GridFS)
+        file_id = mongo_client.store_file(
+            file_bytes=wav_bytes,
+            filename="recording.wav",
+            content_type="audio/wav",
+            metadata={"purpose": "speech-to-text"}
+        )
+
+        # Transcribe
+        transcription_text = transcribe_whisper(wav_bytes)
+
+        # Store the record (input is the file ID, output is the text)
+        mongo_client.store_interaction(
+            interaction_type="speech-to-text",
+            input_data=f"(WAV file in DB) file_id={file_id}",
+            output_data=transcription_text,
+            model_name="whisper"
+        )
+
         return jsonify({'transcription': transcription_text})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -130,7 +174,7 @@ def transcribe_audio():
 @app.route('/api/tts', methods=['POST'])
 def tts_endpoint():
     """
-    Convert given text to speech using TTS, with chosen speaker and speed.
+    Convert text to speech using TTS, store the result in DB if desired.
     """
     text = request.form.get('text', '')
     speaker = request.form.get('speaker', 'p229')
@@ -151,7 +195,6 @@ def tts_endpoint():
         local_tts = TTS(model_name="tts_models/en/vctk/vits")
         local_tts.tts_to_file(text=text, file_path=tmp_path, speaker=speaker)
 
-        # Adjust speed via ffmpeg if needed
         if abs(speed - 1.0) > 1e-5:
             tmp_output_path = tmp_path + '.speed.wav'
             cmd = [
@@ -170,11 +213,27 @@ def tts_endpoint():
                 raw_audio = f.read()
             os.remove(tmp_path)
 
+        # Optionally store the TTS result in DB
+        file_id = mongo_client.store_file(
+            file_bytes=raw_audio,
+            filename="tts_output.wav",
+            content_type="audio/wav",
+            metadata={"purpose": "text-to-speech", "speaker": speaker, "speed": speed}
+        )
+        # Also store text record
+        mongo_client.store_interaction(
+            interaction_type="text-to-speech",
+            input_data=text,
+            output_data=f"(TTS audio file in DB) file_id={file_id}",
+            model_name="vits_tts"
+        )
+
         base64_audio = base64.b64encode(raw_audio).decode('utf-8')
         return jsonify({'audio': base64_audio})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Add & Delete model
 @app.route('/api/add_model', methods=['POST'])
 def api_add_model():
     new_model_name = request.form.get('new_model_name', '').strip()
@@ -244,6 +303,13 @@ print("Model Response:", model_result)
         'usage_code': usage_code
     })
 
+# Get server logs
+@app.route('/api/get_server_logs', methods=['GET'])
+def api_get_server_logs():
+    logs = get_triton_logs()
+    return jsonify({'logs': logs})
+
+# Start/Stop Triton server
 @app.route('/api/start_server', methods=['POST'])
 def api_start_server():
     success, msg, logs = start_triton_server()
@@ -258,10 +324,18 @@ def api_stop_server():
         return jsonify({'status': 'success', 'message': msg})
     return jsonify({'error': msg}), 500
 
-@app.route('/api/get_server_logs', methods=['GET'])
-def api_get_server_logs():
-    logs = get_triton_logs()
-    return jsonify({'logs': logs})
+# Example to get a file from DB if needed
+@app.route('/api/get_file/<file_id>', methods=['GET'])
+def api_get_file(file_id):
+    """
+    Retrieve a file from GridFS by file_id and return as raw bytes or base64.
+    """
+    try:
+        file_bytes = mongo_client.get_file(file_id)
+        b64 = base64.b64encode(file_bytes).decode("utf-8")
+        return jsonify({"base64_data": b64})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=True)

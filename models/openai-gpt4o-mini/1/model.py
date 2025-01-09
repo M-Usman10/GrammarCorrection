@@ -16,7 +16,6 @@ logger = logging.getLogger("openai-gpt4o-mini_logger")
 
 class TritonPythonModel:
     def initialize(self, args):
-        # Keep the original name in the list
         self.client = ai.Client()
         self.models = ["openai:gpt-4o-mini"]
         logger.info(f"Model(s) configured: {self.models}")
@@ -29,13 +28,12 @@ class TritonPythonModel:
                 raise ValueError("Input tensor 'INPUT' is missing.")
             input_array = input_tensor.as_numpy()
 
-            # Accept shape [1] or [1,1]
             if len(input_array.shape) == 1:
                 user_cmd = input_array[0]
             elif len(input_array.shape) == 2:
                 user_cmd = input_array[0, 0]
             else:
-                raise ValueError(f"Unexpected shape {input_array.shape} (expected 1D or 2D).")
+                raise ValueError(f"Unexpected shape {input_array.shape}")
 
             if isinstance(user_cmd, bytes):
                 user_cmd = user_cmd.decode("utf-8")

@@ -77,6 +77,30 @@
     .hidden {
       display: none !important;
     }
+    .audio-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .audio-controls button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+    .audio-controls span {
+      white-space: nowrap;
+      font-size: 0.9rem;
+      width: 6rem;
+      text-align: center;
+    }
+    /* Custom whisper audio styles */
+    .whisperAudio {
+      margin-top:15px;
+      width:100%;
+    }
   </style>
 </head>
 <body>
@@ -130,8 +154,55 @@
                   <button type="submit" class="btn btn-primary w-100" id="submitQueryBtn">Submit</button>
                 </form>
 
-                <!-- Microphone Record Button -->
-                <div class="text-center mt-3">
+                <!-- Whisper Transcription Container -->
+                <div id="whisper-container" class="mt-4" style="display:none;">
+                  <h6>Whisper Transcription</h6>
+                  <textarea class="form-control" id="whisper-transcription-editable" rows="3"></textarea>
+
+                  <!-- Buttons: Generate Audio (left) + Submit for Inference (right) -->
+                  <div class="mt-2 d-flex align-items-center justify-content-start gap-2">
+                    <button id="playWhisperTTSBtn" class="btn speaker-btn">
+                      <i class="bi bi-volume-up"></i> Generate Audio
+                    </button>
+                    <button id="whisperInferenceBtn" class="btn btn-primary ms-auto">Submit for Inference</button>
+                  </div>
+
+                  <!-- Audio Player for Whisper TTS result -->
+                  <audio id="whisperAudio" class="hidden whisperAudio" preload="metadata"></audio>
+                  <div class="audio-controls" id="whisperAudioControls" style="display:none;">
+                    <button id="whisperPlayPauseBtn" class="btn btn-primary btn-sm">
+                      <i class="bi bi-play-fill"></i>
+                    </button>
+                    <span id="whisperAudioTime">00:00 / 00:00</span>
+                    <input type="range" min="0" max="100" step="1" value="0"
+                           id="whisperAudioProgress" class="form-range"/>
+                  </div>
+                </div>
+
+                <!-- Model Response Container -->
+                <div id="response-container" class="mt-4" style="display:none;">
+                  <h6>Model Response</h6>
+                  <div class="alert alert-secondary" id="response"></div>
+                  <!-- Audio Player for Model TTS result -->
+                  <div class="mt-3">
+                    <button id="playResponseTTSBtn" class="btn speaker-btn">
+                      <i class="bi bi-volume-up"></i> Generate Audio
+                    </button>
+                    <!-- Hidden audio element + custom controls -->
+                    <audio id="responseAudio" preload="metadata" style="display:none;"></audio>
+                    <div class="audio-controls" id="responseAudioControls" style="display:none;">
+                      <button id="responsePlayPauseBtn" class="btn btn-primary btn-sm">
+                        <i class="bi bi-play-fill"></i>
+                      </button>
+                      <span id="responseAudioTime">00:00 / 00:00</span>
+                      <input type="range" min="0" max="100" step="1" value="0"
+                             id="responseAudioProgress" class="form-range"/>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Microphone Record Button (below transcription/response) -->
+                <div class="text-center mt-4">
                   <button id="startRecordingBtn" class="btn mic-btn">
                     <i class="bi bi-mic"></i> Record
                   </button>
@@ -139,9 +210,7 @@
 
                 <!-- Recording UI (hidden initially) -->
                 <div id="recordingUI" class="mt-4 hidden text-center">
-                  <!-- We show the "Recording..." inside onstart event -->
                   <p class="recording-indicator" id="recordingIndicator" style="display:none;">Recording...</p>
-
                   <!-- Timer element -->
                   <p id="record-timer" style="font-size: 1.2rem; margin-bottom: 1rem;">00:00</p>
 
@@ -162,28 +231,7 @@
                   </div>
                   <p class="mt-2">Processing your request...</p>
                 </div>
-
-                <!-- Editable Transcription Container -->
-                <div id="whisper-container" class="mt-4" style="display:none;">
-                  <h6>Whisper Transcription</h6>
-                  <textarea class="form-control" id="whisper-transcription-editable" rows="3"></textarea>
-                  <div class="mt-2 d-flex justify-content-end gap-2">
-                    <button id="whisperInferenceBtn" class="btn btn-primary">Submit for Inference</button>
-                    <button id="playWhisperTTSBtn" class="btn speaker-btn">
-                      <i class="bi bi-volume-up"></i> Play (Whisper TTS)
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Response Container -->
-                <div id="response-container" class="mt-4" style="display:none;">
-                  <h6>Model Response</h6>
-                  <div class="alert alert-secondary" id="response"></div>
-                  <button id="playResponseTTSBtn" class="btn speaker-btn">
-                    <i class="bi bi-volume-up"></i> Play (Model TTS)
-                  </button>
-                </div>
-              </div>
+              </div> <!-- card-body -->
             </div>
           </div>
         </div>
@@ -353,7 +401,7 @@
                     <span id="modelTtsSpeedValue">1.0x</span>
                   </div>
                 </div>
-              </div>
+              </div> <!-- card-body -->
             </div>
           </div>
         </div>
@@ -379,7 +427,7 @@
                 </div>
                 <!-- Triton logs box -->
                 <div id="server-logs-box" class="logs-box mt-3" style="display:none;"></div>
-              </div>
+              </div> <!-- card-body -->
             </div>
           </div>
         </div>
@@ -406,7 +454,10 @@
         sel.append(`<option value="" disabled selected>Select a model</option>`);
         if(data.models && data.models.length){
           data.models.forEach(m => {
-            sel.append(`<option value="${m}">${m}</option>`);
+            // Exclude 'whisper' from the list
+            if(m !== "whisper"){
+              sel.append(`<option value="${m}">${m}</option>`);
+            }
           });
         }
       });
@@ -427,7 +478,7 @@
         const totalSeconds = Math.floor(elapsedMs / 1000);
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
-        const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        const timeStr = `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
         document.getElementById("record-timer").textContent = timeStr;
       }, 1000);
     }
@@ -443,17 +494,13 @@
       loadModelsForDropdown("#delete_model_name");
       loadModelsForDropdown("#code_model_name");
 
-      /**********************************************
-       * SHIFT+Enter for new line, Enter for submit *
-       **********************************************/
-      // For the normal query area:
+      // SHIFT+Enter for new line, Enter for submit
       $("#query").keydown(function(e){
         if(e.keyCode === 13 && !e.shiftKey) {
           e.preventDefault();
           $("#model-form").submit();
         }
       });
-      // For the transcribed text area:
       $("#whisper-transcription-editable").keydown(function(e){
         if(e.keyCode === 13 && !e.shiftKey) {
           e.preventDefault();
@@ -461,12 +508,17 @@
         }
       });
 
-      // Handle normal text-based query
+      // Normal text-based query
       $("#model-form").on("submit", function(e){
         e.preventDefault();
+        // Hide or reset TTS UI
+        resetModelTtsUI();
+        resetWhisperTtsUI();
+
         $("#response-container").hide();
         $("#whisper-container").hide();
         $("#loader").show();
+
         $.post("/api/query", $(this).serialize(), function(data){
           $("#loader").hide();
           if(data.response){
@@ -485,24 +537,25 @@
 
       // Start recording
       $("#startRecordingBtn").click(async function(){
-        // Hide text query fields while recording
-        $("#textQueryContainer").addClass("hidden");
-        $("#submitQueryBtn").addClass("hidden");
-        $("#recordingUI").removeClass("hidden");
         $("#response-container").hide();
         $("#whisper-container").hide();
+        $("#textQueryContainer").addClass("hidden");
+        $("#submitQueryBtn").addClass("hidden");
         audioChunks = [];
+
+        // Hide or reset TTS UI
+        resetModelTtsUI();
+        resetWhisperTtsUI();
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
 
-          // show "Recording..." only once recording has really started
           mediaRecorder.onstart = function() {
+            $("#recordingUI").removeClass("hidden");
             $("#recordingIndicator").show();
             startRecordingTimer();
           };
-          // gather chunks
           mediaRecorder.ondataavailable = (e) => {
             if(e.data.size > 0) {
               audioChunks.push(e.data);
@@ -511,7 +564,6 @@
           mediaRecorder.start();
 
         } catch (err) {
-          // Show an error message on the UI if recording cannot start
           $("#recordingUI").addClass("hidden");
           $("#response").text("Error: Unable to start recording. " + err.message);
           $("#response-container").show();
@@ -529,17 +581,16 @@
         resetRecordingUI();
       });
 
-      // Confirm recording => call /api/transcribe
+      // Confirm recording => /api/transcribe
       $("#confirmRecordingBtn").click(async function(){
         if(mediaRecorder && mediaRecorder.state !== 'inactive'){
           mediaRecorder.stop();
         }
-        // Once recording stops, handle sending audio
         mediaRecorder.onstop = async () => {
           $("#loader").show();
-          $("#recordingUI").addClass("hidden");
-          $("#recordingIndicator").hide();
           stopRecordingTimer();
+          $("#recordingIndicator").hide();
+          $("#recordingUI").addClass("hidden");
 
           const blob = new Blob(audioChunks, { type: 'audio/webm; codecs=opus' });
           const formData = new FormData();
@@ -572,7 +623,13 @@
         };
       });
 
-      // Button to do inference from the current whisper text
+      function resetRecordingUI() {
+        $("#textQueryContainer").removeClass("hidden");
+        $("#submitQueryBtn").removeClass("hidden");
+        $("#recordingUI").addClass("hidden");
+      }
+
+      // Submit for Inference from Whisper transcription
       $("#whisperInferenceBtn").click(function(){
         const input_text = $("#whisper-transcription-editable").val().trim();
         const model = $("#model").val();
@@ -584,6 +641,10 @@
           alert("No text to infer. Please transcribe or type something.");
           return;
         }
+        // Hide or reset TTS UI
+        resetModelTtsUI();
+        resetWhisperTtsUI();
+
         $("#loader").show();
         $("#response-container").hide();
 
@@ -603,46 +664,160 @@
         });
       });
 
-      // reset UI after any record attempt finishes
-      function resetRecordingUI() {
-        $("#textQueryContainer").removeClass("hidden");
-        $("#submitQueryBtn").removeClass("hidden");
-        $("#recordingUI").addClass("hidden");
-      }
+      /***********************************************
+       * Audio playback with custom controls (Model) *
+       ***********************************************/
+      const responseAudio = document.getElementById("responseAudio");
+      const responseAudioControls = document.getElementById("responseAudioControls");
+      const responsePlayPauseBtn = document.getElementById("responsePlayPauseBtn");
+      const responseAudioProgress = document.getElementById("responseAudioProgress");
+      const responseAudioTime = document.getElementById("responseAudioTime");
 
-      // Play TTS for Whisper Transcription
-      $("#playWhisperTTSBtn").click(function(){
-        const text = $("#whisper-transcription-editable").val().trim();
-        if(!text) return;
-        const speaker = $("#whisperTtsSpeakerSelect").val();
-        const speed = $("#whisperTtsSpeedRange").val();
-        $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
-          if(data.audio){
-            const audio = new Audio("data:audio/wav;base64," + data.audio);
-            audio.play();
-          }
-        }).fail(function(xhr){
-          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-        });
-      });
-
-      // Play TTS for Model Response
       $("#playResponseTTSBtn").click(function(){
+        // Hide or reset existing audio UI first
+        resetModelTtsUI();
+
         const text = $("#response").text().trim();
         if(!text) return;
         const speaker = $("#modelTtsSpeakerSelect").val();
         const speed = $("#modelTtsSpeedRange").val();
+
         $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
           if(data.audio){
-            const audio = new Audio("data:audio/wav;base64," + data.audio);
-            audio.play();
+            responseAudioControls.style.display = "flex";
+            responseAudio.style.display = "none"; // Keep hidden <audio>, custom controls
+            responseAudio.src = "data:audio/wav;base64," + data.audio;
+            responseAudio.load();
+            responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+            responseAudioProgress.value = 0;
+            responseAudioTime.textContent = "00:00 / 00:00";
           }
         }).fail(function(xhr){
           alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
         });
       });
 
-      // Update TTS speed labels
+      function resetModelTtsUI(){
+        responseAudio.pause();
+        responseAudio.src = "";
+        responseAudioTime.textContent = "00:00 / 00:00";
+        responseAudioProgress.value = 0;
+        responseAudioControls.style.display = "none";
+      }
+
+      responsePlayPauseBtn.addEventListener("click", function(){
+        if(responseAudio.paused || responseAudio.currentTime <= 0){
+          responseAudio.play();
+          responsePlayPauseBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
+        } else {
+          responseAudio.pause();
+          responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+        }
+      });
+
+      responseAudio.addEventListener("timeupdate", function(){
+        if(responseAudio.duration > 0){
+          const percent = (responseAudio.currentTime / responseAudio.duration) * 100;
+          responseAudioProgress.value = percent;
+        }
+        const cur = formatTime(responseAudio.currentTime);
+        const dur = formatTime(responseAudio.duration);
+        responseAudioTime.textContent = `${cur} / ${dur}`;
+      });
+
+      responseAudioProgress.addEventListener("input", function(){
+        if(responseAudio.duration){
+          responseAudio.currentTime = (responseAudioProgress.value / 100) * responseAudio.duration;
+        }
+      });
+
+      responseAudio.addEventListener("ended", function(){
+        responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+      });
+
+      /***********************************************
+       * Audio playback with custom controls (Whisper)
+       ***********************************************/
+      const whisperAudio = document.getElementById("whisperAudio");
+      const whisperAudioControls = document.getElementById("whisperAudioControls");
+      const whisperPlayPauseBtn = document.getElementById("whisperPlayPauseBtn");
+      const whisperAudioProgress = document.getElementById("whisperAudioProgress");
+      const whisperAudioTime = document.getElementById("whisperAudioTime");
+
+      $("#playWhisperTTSBtn").click(function(){
+        // Hide or reset existing audio UI
+        resetWhisperTtsUI();
+
+        const text = $("#whisper-transcription-editable").val().trim();
+        if(!text) return;
+        const speaker = $("#whisperTtsSpeakerSelect").val();
+        const speed = $("#whisperTtsSpeedRange").val();
+
+        $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
+          if(data.audio){
+            whisperAudioControls.style.display = "flex";
+            whisperAudio.classList.remove("hidden");
+            whisperAudio.src = "data:audio/wav;base64," + data.audio;
+            whisperAudio.load();
+            whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+            whisperAudioProgress.value = 0;
+            whisperAudioTime.textContent = "00:00 / 00:00";
+          }
+        }).fail(function(xhr){
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      function resetWhisperTtsUI(){
+        whisperAudio.pause();
+        whisperAudio.src = "";
+        whisperAudioTime.textContent = "00:00 / 00:00";
+        whisperAudioProgress.value = 0;
+        whisperAudioControls.style.display = "none";
+        whisperAudio.classList.add("hidden");
+      }
+
+      whisperPlayPauseBtn.addEventListener("click", function(){
+        if(whisperAudio.paused || whisperAudio.currentTime <= 0){
+          whisperAudio.play();
+          whisperPlayPauseBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
+        } else {
+          whisperAudio.pause();
+          whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+        }
+      });
+
+      whisperAudio.addEventListener("timeupdate", function(){
+        if(whisperAudio.duration > 0){
+          const percent = (whisperAudio.currentTime / whisperAudio.duration) * 100;
+          whisperAudioProgress.value = percent;
+        }
+        const cur = formatTime(whisperAudio.currentTime);
+        const dur = formatTime(whisperAudio.duration);
+        whisperAudioTime.textContent = `${cur} / ${dur}`;
+      });
+
+      whisperAudioProgress.addEventListener("input", function(){
+        if(whisperAudio.duration){
+          whisperAudio.currentTime = (whisperAudioProgress.value / 100) * whisperAudio.duration;
+        }
+      });
+
+      whisperAudio.addEventListener("ended", function(){
+        whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+      });
+
+      // Utility to format time (seconds => mm:ss)
+      function formatTime(seconds) {
+        if(!seconds || isNaN(seconds)){
+          return "00:00";
+        }
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+      }
+
+      // TTS speed label updates
       $("#whisperTtsSpeedRange").on("input", function(){
         $("#whisperTtsSpeedValue").text($(this).val() + "x");
       });
