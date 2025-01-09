@@ -43,7 +43,7 @@
       font-family: monospace;
     }
     input[type="range"] {
-      -webkit-appearance: none;
+      appearance: none;
       width: 100%;
       height: 4px;
       border-radius: 2px;
@@ -51,7 +51,6 @@
       outline: none;
     }
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
       appearance: none;
       width: 14px;
       height: 14px;
@@ -67,48 +66,50 @@
 <div class="container py-4">
   <h1 class="mb-4">MongoDB Records Browser</h1>
 
-  <!-- Display any error messages -->
   {% if error_msg %}
     <div class="alert alert-danger" role="alert">
       {{ error_msg }}
     </div>
   {% endif %}
 
-  <!-- Filter Form -->
-  <!--
-       Using GET so that pagination can persist query parameters in the URL.
-       Adjust if you prefer POST.
-  -->
+  <!-- Filter Form: first row has 5 inputs, second row has raw_query -->
   <div class="card p-3 mb-3">
     <form method="GET" action="/">
-      <div class="row mb-3">
-        <div class="col-md-3">
+      <div class="row mb-2">
+        <div class="col-md-2">
           <label class="form-label">Interaction Type</label>
           <input type="text" class="form-control"
                  name="filter_interaction_type"
                  value="{{ filter_interaction_type }}"
-                 placeholder="e.g. text-to-text, speech-to-text">
+                 placeholder="e.g. text-to-text">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">Model Name</label>
           <input type="text" class="form-control"
                  name="filter_model_name"
                  value="{{ filter_model_name }}"
-                 placeholder="e.g. whisper, T5, vits_tts">
+                 placeholder="e.g. whisper">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">Date From (ISO)</label>
           <input type="text" class="form-control"
                  name="filter_date_from"
                  value="{{ filter_date_from }}"
-                 placeholder="YYYY-MM-DD or 2025-01-08T00:00:00">
+                 placeholder="2025-01-08T00:00:00">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">Date To (ISO)</label>
           <input type="text" class="form-control"
                  name="filter_date_to"
                  value="{{ filter_date_to }}"
-                 placeholder="YYYY-MM-DD or 2025-01-09T23:59:59">
+                 placeholder="2025-01-09T23:59:59">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Activity ID</label>
+          <input type="text" class="form-control"
+                 name="filter_activity_id"
+                 value="{{ filter_activity_id }}"
+                 placeholder="Activity ID">
         </div>
       </div>
 
@@ -120,10 +121,11 @@
                  value="{{ raw_query }}"
                  placeholder='{"model_name": "whisper"}'>
           <small class="text-muted">
-            If a raw query is given, filters above are ignored. Must be valid JSON.
+            If a raw query is given, filters above are ignored.
           </small>
         </div>
       </div>
+
       <button class="btn btn-primary" type="submit">Filter / Query</button>
     </form>
   </div>
@@ -133,30 +135,23 @@
     {% for record in records %}
       <div class="card p-3">
         <h5 class="mb-2">Record ID: {{ record._id }}</h5>
+        <p><strong>Activity ID:</strong> {{ record.activity_id }}</p>
+        <p><strong>Step Index:</strong> {{ record.step_index }}</p>
         <p><strong>Interaction Type:</strong> {{ record.interaction_type }}</p>
         <p><strong>Model Name:</strong> {{ record.model_name }}</p>
         <p><strong>Created At:</strong> {{ record.created_at }}</p>
         <p><strong>Input Data:</strong> {{ record.input_data }}</p>
         <p><strong>Output Data:</strong> {{ record.output_data }}</p>
 
-        <!-- If there's audio_base64, show the custom audio player -->
+        <!-- If there's audio_base64, show custom player -->
         {% if record.audio_base64 %}
           <div class="audio-container mt-2">
-            <!-- Hidden native audio element -->
             <audio
               src="data:audio/wav;base64,{{ record.audio_base64 }}"
               preload="auto"
             ></audio>
-
-            <!-- Custom play button -->
-            <button class="btn-play" type="button" onclick="togglePlay(this)">
-              ►
-            </button>
-
-            <!-- Slider for progress -->
+            <button class="btn-play" type="button" onclick="togglePlay(this)">►</button>
             <input type="range" value="0" min="0" max="100" step="1" onchange="seekAudio(this)">
-
-            <!-- Time display -->
             <span class="time-display">0:00</span>
           </div>
         {% elif record.audio_error %}
@@ -168,17 +163,17 @@
     <p>No records found or none match your filters.</p>
   {% endif %}
 
-  <!-- Pagination Controls -->
+  <!-- Pagination -->
   {% if total_pages and total_pages > 1 %}
   <div class="mt-3">
     <nav aria-label="Pagination">
       <ul class="pagination">
 
-        <!-- Previous Button -->
+        <!-- Previous -->
         {% if current_page > 1 %}
         <li class="page-item">
           <a class="page-link"
-             href="?page={{ current_page - 1 }}&filter_interaction_type={{ filter_interaction_type }}&filter_model_name={{ filter_model_name }}&filter_date_from={{ filter_date_from }}&filter_date_to={{ filter_date_to }}&raw_query={{ raw_query }}">
+             href="?page={{ current_page - 1 }}&filter_interaction_type={{ filter_interaction_type }}&filter_model_name={{ filter_model_name }}&filter_date_from={{ filter_date_from }}&filter_date_to={{ filter_date_to }}&filter_activity_id={{ filter_activity_id }}&raw_query={{ raw_query }}">
             Previous
           </a>
         </li>
@@ -186,21 +181,20 @@
         <li class="page-item disabled"><span class="page-link">Previous</span></li>
         {% endif %}
 
-        <!-- Page Number Buttons -->
         {% for p in range(1, total_pages + 1) %}
         <li class="page-item {% if p == current_page %}active{% endif %}">
           <a class="page-link"
-             href="?page={{ p }}&filter_interaction_type={{ filter_interaction_type }}&filter_model_name={{ filter_model_name }}&filter_date_from={{ filter_date_from }}&filter_date_to={{ filter_date_to }}&raw_query={{ raw_query }}">
+             href="?page={{ p }}&filter_interaction_type={{ filter_interaction_type }}&filter_model_name={{ filter_model_name }}&filter_date_from={{ filter_date_from }}&filter_date_to={{ filter_date_to }}&filter_activity_id={{ filter_activity_id }}&raw_query={{ raw_query }}">
             {{ p }}
           </a>
         </li>
         {% endfor %}
 
-        <!-- Next Button -->
+        <!-- Next -->
         {% if current_page < total_pages %}
         <li class="page-item">
           <a class="page-link"
-             href="?page={{ current_page + 1 }}&filter_interaction_type={{ filter_interaction_type }}&filter_model_name={{ filter_model_name }}&filter_date_from={{ filter_date_from }}&filter_date_to={{ filter_date_to }}&raw_query={{ raw_query }}">
+             href="?page={{ current_page + 1 }}&filter_interaction_type={{ filter_interaction_type }}&filter_model_name={{ filter_model_name }}&filter_date_from={{ filter_date_from }}&filter_date_to={{ filter_date_to }}&filter_activity_id={{ filter_activity_id }}&raw_query={{ raw_query }}">
             Next
           </a>
         </li>
@@ -214,13 +208,11 @@
   {% endif %}
 </div>
 
-<!-- Bootstrap JS + custom audio player logic -->
 <script
   src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
 </script>
-
 <script>
-  // Simple custom audio player for each card
+  // Simple custom audio player
   function togglePlay(btn) {
     const audioContainer = btn.closest('.audio-container');
     const audio = audioContainer.querySelector('audio');
@@ -229,13 +221,12 @@
 
     if (audio.paused) {
       audio.play();
-      btn.textContent = '❚❚'; // Pause symbol
+      btn.textContent = '❚❚'; // pause symbol
     } else {
       audio.pause();
-      btn.textContent = '►'; // Play symbol
+      btn.textContent = '►'; // play symbol
     }
 
-    // Update progress
     audio.addEventListener('timeupdate', function() {
       const currentTime = audio.currentTime;
       const duration = audio.duration || 0;
@@ -247,7 +238,6 @@
       timeDisplay.textContent = formatTime(currentTime);
     });
 
-    // On ended, reset
     audio.addEventListener('ended', function() {
       btn.textContent = '►';
       range.value = 0;
@@ -270,6 +260,5 @@
     return m + ":" + (s < 10 ? "0" + s : s);
   }
 </script>
-
 </body>
 </html>

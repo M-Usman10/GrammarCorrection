@@ -98,89 +98,39 @@
         justify-content: center;
         width: 2.5rem;
       }
-
       .form-range {
-        -webkit-appearance: none; /* Removes default styles */
         appearance: none;
-        width: 100%; /* Set the width of the range slider */
-        height: 8px; /* Height of the track */
-        background: #ddd; /* Default track color */
-        border-radius: 4px; /* Rounded edges */
-        outline: none; /* Removes outline when focused */
-        cursor: pointer;
-      }
-
-      /* Track (default) */
-      .form-range::-webkit-slider-runnable-track {
-        background: black; /* Default track color */
+        width: 100%;
         height: 8px;
+        background: #ddd;
         border-radius: 4px;
-      }
-
-      .form-range::-webkit-range-progress {
-        background: gray; /* Progress color */
-        height: 8px;
-        border-radius: 4px;
-      }
-      /* Track (Firefox) */
-      .form-range::-moz-range-track {
-        background: black;
-        height: 8px;
-        border-radius: 4px;
-      }
-
-      /* Thumb styling */
-      .form-range::-webkit-slider-thumb {
-        -webkit-appearance: none; /* Removes default styles */
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        background: gray; /* Thumb color */
-        border-radius: 50%; /* Circular thumb */
-        cursor: pointer;
-        box-shadow: none;
-      }
-
-      .form-range::-moz-range-thumb {
-        -webkit-appearance: none; /* Removes default styles */
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        background: gray; /* Thumb color */
-        border-radius: 50%; /* Circular thumb */
-        cursor: pointer;
-        box-shadow: none;
-      }
-
-      /* Progress (before the thumb) */
-      .form-range::-webkit-slider-runnable-track {
-        background: black;
-      }
-
-      .form-range::-moz-range-progress {
-        background: gray; /* Progress color */
-        height: 8px;
-        border-radius: 4px;
-      }
-
-      /* Set custom property for progress percentage */
-      .form-range {
-        --progress-percent: 50%;
-      }
-
-      /* Update progress on input */
-      .form-range:active,
-      .form-range:focus {
         outline: none;
+        cursor: pointer;
       }
-
+      .form-range::-webkit-slider-runnable-track {
+        background: black;
+        height: 8px;
+        border-radius: 4px;
+      }
+      .form-range::-webkit-range-progress {
+        background: gray;
+        height: 8px;
+        border-radius: 4px;
+      }
+      .form-range::-webkit-slider-thumb {
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: gray;
+        border-radius: 50%;
+        cursor: pointer;
+      }
       .audio-controls span {
         white-space: nowrap;
         font-size: 0.9rem;
         width: 6rem;
         text-align: center;
       }
-      /* Custom whisper audio styles */
       .whisperAudio {
         margin-top: 15px;
         width: 100%;
@@ -271,48 +221,92 @@
           <div class="row justify-content-center g-4 mt-3">
             <div class="col-md-8">
               <div class="card border-0 shadow-sm">
-                <div class="card-header text-center bg-white">
-                  <h5 class="mb-0">Triton Model Inference</h5>
-                </div>
-                <div class="card-body">
-                  <!-- Mic + Normal Query Container -->
-                  <form id="model-form">
-                    <div class="mb-3">
-                      <label for="model" class="form-label">Select Model</label>
-                      <select
-                        class="form-select"
-                        id="model"
-                        name="model"
-                        required
+                <!-- Updated card-header layout -->
+                <div class="card-header bg-white">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <!-- Left: "Current Activity ID" label (bold) and the ID -->
+                    <div>
+                      <span class="me-2 fw-bold">Current Activity ID:</span>
+                      <span id="currentActivityLabel"></span>
+                    </div>
+                    <!-- Right: Activity controls (Enter ID, refresh, load, back/next) -->
+                    <div class="d-flex align-items-center">
+                      <input
+                        type="text"
+                        id="loadActivityInput"
+                        class="form-control form-control-sm me-2"
+                        placeholder="Enter Activity ID"
+                        style="width: 150px;"
+                      />
+                      <!-- Icon button for refresh (no text) -->
+                      <button
+                        id="refreshActivityBtn"
+                        class="btn btn-light btn-sm me-2"
                       >
-                        <option value="" disabled selected>
-                          Loading models...
-                        </option>
-                      </select>
+                        <i class="bi bi-arrow-clockwise"></i>
+                      </button>
+                      <button id="loadActivityBtn" class="btn btn-secondary btn-sm me-2">
+                        Load
+                      </button>
+                      <button id="backBtn" class="btn btn-outline-secondary btn-sm me-2">
+                        Back
+                      </button>
+                      <button id="nextBtn" class="btn btn-outline-secondary btn-sm">
+                        Next
+                      </button>
                     </div>
-                    <div class="mb-3" id="textQueryContainer">
-                      <label for="query" class="form-label">Enter Query</label>
-                      <textarea
-                        class="form-control"
-                        id="query"
-                        name="query"
-                        rows="3"
-                        required
-                      ></textarea>
-                    </div>
-                    <button
-                      type="submit"
-                      class="btn btn-primary w-100"
-                      id="submitQueryBtn"
-                    >
-                      Submit
-                    </button>
-                  </form>
+                  </div>
+                </div>
+                <!-- card-body -->
+                <div class="card-body">
+                  <!-- 1) Model Response: text -->
+                  <div
+                    id="response-container"
+                    class="mb-3"
+                    style="display: none"
+                  >
+                    <h6>Model Response</h6>
+                    <div class="alert alert-secondary" id="response"></div>
+                  </div>
 
-                  <!-- Whisper Transcription Container -->
+                  <!-- 2) Model Response: audio -->
+                  <div class="mb-3" id="responseAudioSection" style="display: none">
+                    <button id="playResponseTTSBtn" class="btn speaker-btn">
+                      <i class="bi bi-volume-up"></i> Generate Audio
+                    </button>
+                    <audio
+                      id="responseAudio"
+                      preload="metadata"
+                      style="display: none"
+                    ></audio>
+                    <div
+                      class="audio-controls"
+                      id="responseAudioControls"
+                      style="display: none"
+                    >
+                      <button
+                        id="responsePlayPauseBtn"
+                        class="border-0"
+                      >
+                        <i class="bi bi-play-fill"></i>
+                      </button>
+                      <span id="responseAudioTime">00:00 / 00:00</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value="0"
+                        id="responseAudioProgress"
+                        class="form-range"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- 3) Model Transcript: txt (Whisper transcription) -->
                   <div
                     id="whisper-container"
-                    class="mt-4"
+                    class="mb-3"
                     style="display: none"
                   >
                     <h6>Whisper Transcription</h6>
@@ -321,23 +315,13 @@
                       id="whisper-transcription-editable"
                       rows="3"
                     ></textarea>
+                  </div>
 
-                    <!-- Buttons: Generate Audio (left) + Submit for Inference (right) -->
-                    <div
-                      class="mt-2 d-flex align-items-center justify-content-start gap-2"
-                    >
-                      <button id="playWhisperTTSBtn" class="btn speaker-btn">
-                        <i class="bi bi-volume-up"></i> Generate Audio
-                      </button>
-                      <button
-                        id="whisperInferenceBtn"
-                        class="btn btn-primary ms-auto"
-                      >
-                        Submit for Inference
-                      </button>
-                    </div>
-
-                    <!-- Audio Player for Whisper TTS result -->
+                  <!-- 4) Model Transcript: audio (the TTS of the whisper text) -->
+                  <div class="mb-3" id="whisperAudioSection" style="display: none">
+                    <button id="playWhisperTTSBtn" class="btn speaker-btn">
+                      <i class="bi bi-volume-up"></i> Generate Audio
+                    </button>
                     <audio
                       id="whisperAudio"
                       class="hidden whisperAudio"
@@ -364,53 +348,54 @@
                     </div>
                   </div>
 
-                  <!-- Model Response Container -->
-                  <div
-                    id="response-container"
-                    class="mt-4"
-                    style="display: none"
-                  >
-                    <h6>Model Response</h6>
-                    <div class="alert alert-secondary" id="response"></div>
-                    <!-- Audio Player for Model TTS result -->
-                    <div class="mt-3">
-                      <button id="playResponseTTSBtn" class="btn speaker-btn">
-                        <i class="bi bi-volume-up"></i> Generate Audio
-                      </button>
-                      <!-- Hidden audio element + custom controls -->
-                      <audio
-                        id="responseAudio"
-                        preload="metadata"
-                        style="display: none"
-                      ></audio>
-                      <div
-                        class="audio-controls"
-                        id="responseAudioControls"
-                        style="display: none"
-                      >
-                        <button
-                          id="responsePlayPauseBtn"
-                          class="border-0"
-                        >
-                          <i class="bi bi-play-fill"></i>
-                        </button>
-
-                        <span id="responseAudioTime">00:00 / 00:00</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="1"
-                          value="0"
-                          id="responseAudioProgress"
-                          class="form-range"
-                        />
-                      </div>
-                    </div>
+                  <!-- 5) Submit for Inference (whisper) -->
+                  <div class="mb-3" id="whisperInferenceSection" style="display: none">
+                    <button
+                      id="whisperInferenceBtn"
+                      class="btn btn-primary w-100"
+                    >
+                      Submit Whisper Text for Inference
+                    </button>
                   </div>
 
-                  <!-- Microphone Record Button (below transcription/response) -->
-                  <div class="text-center mt-4">
+                  <!-- 6) Select model -->
+                  <div class="mb-3">
+                    <label for="model" class="form-label">Select Model</label>
+                    <select
+                      class="form-select"
+                      id="model"
+                      name="model"
+                      required
+                    >
+                      <option value="" disabled selected>
+                        Loading models...
+                      </option>
+                    </select>
+                  </div>
+
+                  <!-- 7) User query: txt -->
+                  <div class="mb-3">
+                    <label for="query" class="form-label">User Query</label>
+                    <textarea
+                      class="form-control"
+                      id="query"
+                      name="query"
+                      rows="3"
+                    ></textarea>
+                  </div>
+
+                  <!-- 8) Submit button (user query) -->
+                  <div class="mb-3">
+                    <button
+                      class="btn btn-primary w-100"
+                      id="submitQueryBtn"
+                    >
+                      Submit Query
+                    </button>
+                  </div>
+
+                  <!-- 9) user input: audio (record button) -->
+                  <div class="text-center">
                     <button id="startRecordingBtn" class="btn mic-btn">
                       <i class="bi bi-mic"></i> Record
                     </button>
@@ -432,7 +417,6 @@
                     >
                       00:00
                     </p>
-
                     <div class="d-flex justify-content-center gap-3">
                       <button id="cancelRecordingBtn" class="btn btn-secondary">
                         <i class="bi bi-x-lg"></i>
@@ -455,7 +439,7 @@
                     <p class="mt-2">Processing your request...</p>
                   </div>
                 </div>
-                <!-- card-body -->
+                <!-- /card-body -->
               </div>
             </div>
           </div>
@@ -796,64 +780,45 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-      function loadModelsForDropdown(selector) {
-        $.get("/api/list_models", function (data) {
-          const sel = $(selector);
-          sel.empty();
-          sel.append(
-            `<option value="" disabled selected>Select a model</option>`
-          );
-          if (data.models && data.models.length) {
-            data.models.forEach((m) => {
-              // Exclude 'whisper' from the list
-              if (m !== "whisper") {
-                sel.append(`<option value="${m}">${m}</option>`);
-              }
-            });
-          }
-        });
-      }
+      /********************************************
+       *       GLOBAL STATE + HELPER FUNCS        *
+       ********************************************/
+      let currentActivityId = null;
+      let activityRecords = []; // All records in this activity
+      let currentRecordIndex = -1; // Which record is being displayed
 
       let mediaRecorder;
       let audioChunks = [];
-
-      // Timer-related variables
       let recordInterval;
       let recordStartTime;
 
-      // Start the timer
-      function startRecordingTimer() {
-        recordStartTime = Date.now();
-        recordInterval = setInterval(function () {
-          const elapsedMs = Date.now() - recordStartTime;
-          const totalSeconds = Math.floor(elapsedMs / 1000);
-          const minutes = Math.floor(totalSeconds / 60);
-          const seconds = totalSeconds % 60;
-          const timeStr = `${String(minutes).padStart(2, "0")}:${String(
-            seconds
-          ).padStart(2, "0")}`;
-          document.getElementById("record-timer").textContent = timeStr;
-        }, 1000);
+      // Format time helper
+      function formatTime(seconds) {
+        if (!seconds || isNaN(seconds)) {
+          return "00:00";
+        }
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return (
+          String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0")
+        );
       }
 
-      // Stop the timer and reset to 00:00
-      function stopRecordingTimer() {
-        clearInterval(recordInterval);
-        document.getElementById("record-timer").textContent = "00:00";
-      }
-
+      /********************************************
+       *         ON DOCUMENT READY               *
+       ********************************************/
       $(document).ready(function () {
-        loadModelsForDropdown("#model");
-        loadModelsForDropdown("#delete_model_name");
-        loadModelsForDropdown("#code_model_name");
+        // Always start a new activity on page load
+        createNewActivity();
 
-        // SHIFT+Enter for new line, Enter for submit
+        // SHIFT+ENTER => new line, ENTER => submit in #query
         $("#query").keydown(function (e) {
           if (e.keyCode === 13 && !e.shiftKey) {
             e.preventDefault();
-            $("#model-form").submit();
+            $("#submitQueryBtn").click();
           }
         });
+        // SHIFT+ENTER => new line, ENTER => submit in #whisper-transcription-editable
         $("#whisper-transcription-editable").keydown(function (e) {
           if (e.keyCode === 13 && !e.shiftKey) {
             e.preventDefault();
@@ -861,44 +826,106 @@
           }
         });
 
-        // Normal text-based query
-        $("#model-form").on("submit", function (e) {
-          e.preventDefault();
-          // Hide or reset TTS UI
+        // Load model list
+        loadModelsForDropdown("#model");
+        loadModelsForDropdown("#delete_model_name");
+        loadModelsForDropdown("#code_model_name");
+
+        // Refresh => new activity
+        $("#refreshActivityBtn").click(function () {
+          createNewActivity();
+        });
+
+        // Load => fetch existing activity by ID
+        $("#loadActivityBtn").click(function () {
+          const inputId = $("#loadActivityInput").val().trim();
+          if (!inputId) return;
+          currentActivityId = inputId;
+          $("#currentActivityLabel").text(currentActivityId);
+          fetchActivityRecords(); // fetch & display from DB
+        });
+
+        // Back/Next buttons
+        $("#backBtn").click(function () {
+          if (activityRecords.length === 0) return;
+          if (currentRecordIndex > 0) {
+            currentRecordIndex--;
+            displayRecord(activityRecords[currentRecordIndex]);
+          }
+        });
+        $("#nextBtn").click(function () {
+          if (activityRecords.length === 0) return;
+          if (currentRecordIndex < activityRecords.length - 1) {
+            currentRecordIndex++;
+            displayRecord(activityRecords[currentRecordIndex]);
+          }
+        });
+
+        // Submit user query
+        $("#submitQueryBtn").click(function () {
+          submitTextQuery();
+        });
+
+        // Submit whisper text for inference
+        $("#whisperInferenceBtn").click(function () {
+          const input_text = $("#whisper-transcription-editable").val().trim();
+          const model = $("#model").val();
+          if (!model) {
+            alert("Please select a model first.");
+            return;
+          }
+          if (!input_text) {
+            alert("No text to infer. Please transcribe or type something.");
+            return;
+          }
           resetModelTtsUI();
           resetWhisperTtsUI();
 
-          $("#response-container").hide();
-          $("#whisper-container").hide();
           $("#loader").show();
+          $("#response-container").hide();
 
-          $.post("/api/query", $(this).serialize(), function (data) {
-            $("#loader").hide();
-            if (data.response) {
-              $("#response").text(data.response);
-              $("#response-container").show();
-            } else {
-              $("#response").text("Error: " + data.error);
-              $("#response-container").show();
+          $.post(
+            "/api/query",
+            {
+              model: model,
+              query: input_text,
+              activity_id: currentActivityId
+            },
+            function (data) {
+              $("#loader").hide();
+              if (data.response) {
+                // Fill the UI with the new model response
+                $("#response").text(data.response);
+                $("#response-container").show();
+                $("#responseAudioSection").show(); // let user generate audio
+                // Now refetch the entire activity so it's in our history
+                fetchActivityRecords(true);
+              } else {
+                $("#response").text("Error: " + data.error);
+                $("#response-container").show();
+                $("#responseAudioSection").hide();
+              }
             }
-          }).fail(function (xhr) {
+          ).fail(function (xhr) {
             $("#loader").hide();
             $("#response").text(
               "Error: " + (xhr.responseJSON?.error || xhr.statusText)
             );
             $("#response-container").show();
+            $("#responseAudioSection").hide();
           });
         });
 
-        // Start recording
+        // Start recording (mic)
         $("#startRecordingBtn").click(async function () {
+          // Hide old sections
           $("#response-container").hide();
+          $("#responseAudioSection").hide();
           $("#whisper-container").hide();
-          $("#textQueryContainer").addClass("hidden");
-          $("#submitQueryBtn").addClass("hidden");
-          audioChunks = [];
+          $("#whisperAudioSection").hide();
+          $("#whisperInferenceSection").hide();
 
-          // Hide or reset TTS UI
+          audioChunks = [];
           resetModelTtsUI();
           resetWhisperTtsUI();
 
@@ -927,6 +954,7 @@
               "Error: Unable to start recording. " + err.message
             );
             $("#response-container").show();
+            $("#responseAudioSection").hide();
             resetRecordingUI();
           }
         });
@@ -941,8 +969,8 @@
           resetRecordingUI();
         });
 
-        // Confirm recording => /api/transcribe
-        $("#confirmRecordingBtn").click(async function () {
+        // Confirm => send to /api/transcribe
+        $("#confirmRecordingBtn").click(function () {
           if (mediaRecorder && mediaRecorder.state !== "inactive") {
             mediaRecorder.stop();
           }
@@ -957,6 +985,7 @@
             });
             const formData = new FormData();
             formData.append("audio_data", blob, "recording.webm");
+            formData.append("activity_id", currentActivityId);
 
             $.ajax({
               url: "/api/transcribe",
@@ -967,13 +996,19 @@
               success: function (data) {
                 $("#loader").hide();
                 if (data.transcription) {
+                  // Show the new transcription
                   $("#whisper-transcription-editable").val(data.transcription);
                   $("#whisper-container").show();
+                  $("#whisperAudioSection").show();
+                  $("#whisperInferenceSection").show();
                 } else if (data.error) {
                   $("#response").text("Error: " + data.error);
                   $("#response-container").show();
+                  $("#responseAudioSection").hide();
                 }
                 resetRecordingUI();
+                // fetch updates so this new step is in our activityRecords
+                fetchActivityRecords(true);
               },
               error: function (xhr) {
                 $("#loader").hide();
@@ -981,76 +1016,207 @@
                   "Error: " + (xhr.responseJSON?.error || xhr.statusText)
                 );
                 $("#response-container").show();
+                $("#responseAudioSection").hide();
                 resetRecordingUI();
               },
             });
           };
         });
 
-        function resetRecordingUI() {
-          $("#textQueryContainer").removeClass("hidden");
-          $("#submitQueryBtn").removeClass("hidden");
-          $("#recordingUI").addClass("hidden");
-        }
+        // Initialize TTS control logic
+        initTTSControls();
+      });
 
-        // Submit for Inference from Whisper transcription
-        $("#whisperInferenceBtn").click(function () {
-          const input_text = $("#whisper-transcription-editable").val().trim();
-          const model = $("#model").val();
-          if (!model) {
-            alert("Please select a model first.");
-            return;
-          }
-          if (!input_text) {
-            alert("No text to infer. Please transcribe or type something.");
-            return;
-          }
-          // Hide or reset TTS UI
-          resetModelTtsUI();
-          resetWhisperTtsUI();
-
-          $("#loader").show();
-          $("#response-container").hide();
-
-          $.post(
-            "/api/query",
-            { model: model, query: input_text },
-            function (data) {
-              $("#loader").hide();
-              if (data.response) {
-                $("#response").text(data.response);
-                $("#response-container").show();
-              } else {
-                $("#response").text("Error: " + data.error);
-                $("#response-container").show();
-              }
-            }
-          ).fail(function (xhr) {
-            $("#loader").hide();
-            $("#response").text(
-              "Error: " + (xhr.responseJSON?.error || xhr.statusText)
-            );
-            $("#response-container").show();
-          });
+      /********************************************
+       *        CREATE / LOAD / FETCH ACTIVITY    *
+       ********************************************/
+      function createNewActivity() {
+        $.get("/api/new_activity", function (data) {
+          currentActivityId = data.activity_id;
+          $("#currentActivityLabel").text(currentActivityId);
+          activityRecords = [];
+          currentRecordIndex = -1;
         });
+      }
 
-        /***********************************************
-         * Audio playback with custom controls (Model) *
-         ***********************************************/
+      function loadModelsForDropdown(selector) {
+        $.get("/api/list_models", function (data) {
+          const sel = $(selector);
+          sel.empty();
+          sel.append(`<option value="" disabled selected>Select a model</option>`);
+          if (data.models && data.models.length) {
+            data.models.forEach((m) => {
+              sel.append(`<option value="${m}">${m}</option>`);
+            });
+          }
+        });
+      }
+
+      // Pull from DB so we can do back/next
+      function fetchActivityRecords(goToLast = false) {
+        if (!currentActivityId) return;
+        $.get("/api/get_activity?activity_id=" + currentActivityId, (data) => {
+          if (data.records) {
+            activityRecords = data.records;
+            if (activityRecords.length) {
+              if (goToLast) {
+                currentRecordIndex = activityRecords.length - 1;
+              } else {
+                if (currentRecordIndex < 0) {
+                  currentRecordIndex = 0;
+                }
+              }
+              displayRecord(activityRecords[currentRecordIndex]);
+            }
+          }
+        });
+      }
+
+      /********************************************
+       *         DISPLAY / NAVIGATE RECORDS       *
+       ********************************************/
+      function displayRecord(record) {
+        // Clear TTS UIs
+        resetModelTtsUI();
+        resetWhisperTtsUI();
+
+        // Possibly revert user query (#query) to match record.input_data
+        // or revert whisper text (#whisper-transcription-editable)
+        // Then show/hide relevant sections
+        const type = record.interaction_type;
+
+        if (type === "text-to-text") {
+          // The user prompt for text-to-text is record.input_data
+          $("#query").val(record.input_data || "");
+          // The model's response is record.output_data
+          $("#response").text(record.output_data || "");
+          $("#response-container").show();
+
+          // Show "Generate Audio" button if there's something to speak
+          if (record.output_data && record.output_data.trim()) {
+            $("#responseAudioSection").show();
+          } else {
+            $("#responseAudioSection").hide();
+          }
+
+          // Hide whisper parts
+          $("#whisper-container").hide();
+          $("#whisperAudioSection").hide();
+          $("#whisperInferenceSection").hide();
+
+        } else if (type === "speech-to-text") {
+          // The transcribed text is record.output_data
+          $("#whisper-transcription-editable").val(record.output_data || "");
+          $("#whisper-container").show();
+          $("#whisperAudioSection").show();
+          $("#whisperInferenceSection").show();
+
+          // Hide normal response
+          $("#response-container").hide();
+          $("#responseAudioSection").hide();
+
+        } else if (type === "text-to-speech") {
+          // Usually we do not directly display text-to-speech records here
+          // but if needed, you can show them or do nothing
+          $("#response-container").hide();
+          $("#responseAudioSection").hide();
+          $("#whisper-container").hide();
+          $("#whisperAudioSection").hide();
+          $("#whisperInferenceSection").hide();
+        }
+      }
+
+      /********************************************
+       *             SUBMIT USER QUERY            *
+       ********************************************/
+      function submitTextQuery() {
+        const model = $("#model").val();
+        const input_text = $("#query").val().trim();
+        if (!model) {
+          alert("Please select a model first.");
+          return;
+        }
+        if (!input_text) {
+          alert("No text provided.");
+          return;
+        }
+        resetModelTtsUI();
+        resetWhisperTtsUI();
+
+        $("#loader").show();
+        $("#response-container").hide();
+        $("#responseAudioSection").hide();
+
+        $.post("/api/query",
+          {
+            model: model,
+            query: input_text,
+            activity_id: currentActivityId
+          },
+          function (data) {
+            $("#loader").hide();
+            if (data.response) {
+              // show new response
+              $("#response").text(data.response);
+              $("#response-container").show();
+              $("#responseAudioSection").show();
+
+              // fetch updated set of records, jump to last
+              fetchActivityRecords(true);
+            } else {
+              $("#response").text("Error: " + data.error);
+              $("#response-container").show();
+              $("#responseAudioSection").hide();
+            }
+          }
+        ).fail(function (xhr) {
+          $("#loader").hide();
+          $("#response").text(
+            "Error: " + (xhr.responseJSON?.error || xhr.statusText)
+          );
+          $("#response-container").show();
+          $("#responseAudioSection").hide();
+        });
+      }
+
+      /********************************************
+       *              RECORDING TIMER             *
+       ********************************************/
+      function startRecordingTimer() {
+        recordStartTime = Date.now();
+        recordInterval = setInterval(function () {
+          const elapsedMs = Date.now() - recordStartTime;
+          const totalSeconds = Math.floor(elapsedMs / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          const timeStr =
+            String(minutes).padStart(2, "0") +
+            ":" +
+            String(seconds).padStart(2, "0");
+          $("#record-timer").text(timeStr);
+        }, 1000);
+      }
+      function stopRecordingTimer() {
+        clearInterval(recordInterval);
+        $("#record-timer").text("00:00");
+      }
+      function resetRecordingUI() {
+        $("#recordingUI").addClass("hidden");
+        $("#recordingIndicator").hide();
+      }
+
+      /********************************************
+       *         TEXT-TO-SPEECH CONTROLS          *
+       ********************************************/
+      function initTTSControls() {
+        // Model TTS
         const responseAudio = document.getElementById("responseAudio");
-        const responseAudioControls = document.getElementById(
-          "responseAudioControls"
-        );
-        const responsePlayPauseBtn = document.getElementById(
-          "responsePlayPauseBtn"
-        );
-        const responseAudioProgress = document.getElementById(
-          "responseAudioProgress"
-        );
+        const responseAudioControls = document.getElementById("responseAudioControls");
+        const responsePlayPauseBtn = document.getElementById("responsePlayPauseBtn");
+        const responseAudioProgress = document.getElementById("responseAudioProgress");
         const responseAudioTime = document.getElementById("responseAudioTime");
 
         $("#playResponseTTSBtn").click(function () {
-          // Hide or reset existing audio UI first
           resetModelTtsUI();
 
           const text = $("#response").text().trim();
@@ -1060,15 +1226,19 @@
 
           $.post(
             "/api/tts",
-            { text: text, speaker: speaker, speed: speed },
+            {
+              text: text,
+              speaker: speaker,
+              speed: speed,
+              activity_id: currentActivityId
+            },
             function (data) {
               if (data.audio) {
                 responseAudioControls.style.display = "flex";
-                responseAudio.style.display = "none"; // Keep hidden <audio>, custom controls
+                responseAudio.style.display = "none";
                 responseAudio.src = "data:audio/wav;base64," + data.audio;
                 responseAudio.load();
-                responsePlayPauseBtn.innerHTML =
-                  '<i class="bi bi-play-fill"></i>';
+                responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
                 responseAudioProgress.value = 0;
                 responseAudioTime.textContent = "00:00 / 00:00";
               }
@@ -1077,14 +1247,6 @@
             alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
           });
         });
-
-        function resetModelTtsUI() {
-          responseAudio.pause();
-          responseAudio.src = "";
-          responseAudioTime.textContent = "00:00 / 00:00";
-          responseAudioProgress.value = 0;
-          responseAudioControls.style.display = "none";
-        }
 
         responsePlayPauseBtn.addEventListener("click", function () {
           if (responseAudio.paused || responseAudio.currentTime <= 0) {
@@ -1098,8 +1260,7 @@
 
         responseAudio.addEventListener("timeupdate", function () {
           if (responseAudio.duration > 0) {
-            const percent =
-              (responseAudio.currentTime / responseAudio.duration) * 100;
+            const percent = (responseAudio.currentTime / responseAudio.duration) * 100;
             responseAudioProgress.value = percent;
           }
           const cur = formatTime(responseAudio.currentTime);
@@ -1118,34 +1279,14 @@
           responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
         });
 
-        /***********************************************
-         * Audio playback with custom controls (Whisper)
-         ***********************************************/
+        // Whisper TTS
         const whisperAudio = document.getElementById("whisperAudio");
-        const whisperAudioControls = document.getElementById(
-          "whisperAudioControls"
-        );
-        const whisperPlayPauseBtn = document.getElementById(
-          "whisperPlayPauseBtn"
-        );
-        const whisperAudioProgress = document.getElementById(
-          "whisperAudioProgress"
-        );
+        const whisperAudioControls = document.getElementById("whisperAudioControls");
+        const whisperPlayPauseBtn = document.getElementById("whisperPlayPauseBtn");
+        const whisperAudioProgress = document.getElementById("whisperAudioProgress");
         const whisperAudioTime = document.getElementById("whisperAudioTime");
 
         $("#playWhisperTTSBtn").click(function () {
-          whisperAudioControls.style.display = "flex";
-          whisperAudio.classList.remove("hidden");
-          console.log("v  vkrkr r", whisperAudio);
-          whisperAudio.src =
-            "data:audio/wav;base64,UklGRuy3AABXQVZFZm10IBAAAAABAAEAIlYAACJWAAABAAgAZGF0Yci3AACIhISCgH5+enx+gHx4cm5udHp+fHh0cHJ0enx8enx+fn6GiIyMiIaKio6Wmp6goJycnp6coJ6cnJqanqSoqqigmJKSmJygop6ampycmpaOjIiIhoSChoiGgHx2cG5qaGhiYmRkZmRgXFpUUlJUVlhcVlZYWmBgYFxaWlxiZmpsbGxsampubnBwbmxsbnB0cHBub";
-          //
-          console.log("v  vkrkr r", whisperAudio);
-          whisperAudio.load();
-          whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-          whisperAudioProgress.value = 0;
-          whisperAudioTime.textContent = "00:00 / 00:00";
-          // Hide or reset existing audio UI
           resetWhisperTtsUI();
 
           const text = $("#whisper-transcription-editable").val().trim();
@@ -1155,15 +1296,19 @@
 
           $.post(
             "/api/tts",
-            { text: text, speaker: speaker, speed: speed },
+            {
+              text: text,
+              speaker: speaker,
+              speed: speed,
+              activity_id: currentActivityId
+            },
             function (data) {
               if (data.audio) {
                 whisperAudioControls.style.display = "flex";
                 whisperAudio.classList.remove("hidden");
                 whisperAudio.src = "data:audio/wav;base64," + data.audio;
                 whisperAudio.load();
-                whisperPlayPauseBtn.innerHTML =
-                  '<i class="bi bi-play-fill"></i>';
+                whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
                 whisperAudioProgress.value = 0;
                 whisperAudioTime.textContent = "00:00 / 00:00";
               }
@@ -1172,15 +1317,6 @@
             alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
           });
         });
-
-        function resetWhisperTtsUI() {
-          whisperAudio.pause();
-          whisperAudio.src = "";
-          whisperAudioTime.textContent = "00:00 / 00:00";
-          whisperAudioProgress.value = 0;
-          whisperAudioControls.style.display = "none";
-          whisperAudio.classList.add("hidden");
-        }
 
         whisperPlayPauseBtn.addEventListener("click", function () {
           if (whisperAudio.paused || whisperAudio.currentTime <= 0) {
@@ -1194,8 +1330,7 @@
 
         whisperAudio.addEventListener("timeupdate", function () {
           if (whisperAudio.duration > 0) {
-            const percent =
-              (whisperAudio.currentTime / whisperAudio.duration) * 100;
+            const percent = (whisperAudio.currentTime / whisperAudio.duration) * 100;
             whisperAudioProgress.value = percent;
           }
           const cur = formatTime(whisperAudio.currentTime);
@@ -1213,133 +1348,147 @@
         whisperAudio.addEventListener("ended", function () {
           whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
         });
+      }
 
-        // Utility to format time (seconds => mm:ss)
-        function formatTime(seconds) {
-          if (!seconds || isNaN(seconds)) {
-            return "00:00";
+      function resetModelTtsUI() {
+        const responseAudio = document.getElementById("responseAudio");
+        const responseAudioControls = document.getElementById("responseAudioControls");
+        const responseAudioProgress = document.getElementById("responseAudioProgress");
+        const responseAudioTime = document.getElementById("responseAudioTime");
+        const responsePlayPauseBtn = document.getElementById("responsePlayPauseBtn");
+        responseAudio.pause();
+        responseAudio.src = "";
+        responseAudioTime.textContent = "00:00 / 00:00";
+        responseAudioProgress.value = 0;
+        responseAudioControls.style.display = "none";
+        responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+      }
+
+      function resetWhisperTtsUI() {
+        const whisperAudio = document.getElementById("whisperAudio");
+        const whisperAudioControls = document.getElementById("whisperAudioControls");
+        const whisperAudioProgress = document.getElementById("whisperAudioProgress");
+        const whisperAudioTime = document.getElementById("whisperAudioTime");
+        const whisperPlayPauseBtn = document.getElementById("whisperPlayPauseBtn");
+        whisperAudio.pause();
+        whisperAudio.src = "";
+        whisperAudioTime.textContent = "00:00 / 00:00";
+        whisperAudioProgress.value = 0;
+        whisperAudioControls.style.display = "none";
+        whisperAudio.classList.add("hidden");
+        whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+      }
+
+      /********************************************
+       *          MANAGE MODELS & SERVER          *
+       ********************************************/
+      // Add Model
+      $("#add-model-form").on("submit", function (e) {
+        e.preventDefault();
+        $("#add-model-result").hide();
+        $("#usage-code").hide();
+        $.post("/api/add_model", $(this).serialize(), function (data) {
+          if (data.error) {
+            alert("Error: " + data.error);
+          } else {
+            $("#add-model-success").text(data.message);
+            $("#add-model-result").show();
+            $("#usage-code").text(data.usage_code).show();
+            loadModelsForDropdown("#model");
+            loadModelsForDropdown("#delete_model_name");
+            loadModelsForDropdown("#code_model_name");
           }
-          const m = Math.floor(seconds / 60);
-          const s = Math.floor(seconds % 60);
-          return `${m
-            .toString()
-            .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-        }
-
-        // TTS speed label updates
-        $("#whisperTtsSpeedRange").on("input", function () {
-          $("#whisperTtsSpeedValue").text($(this).val() + "x");
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
         });
-        $("#modelTtsSpeedRange").on("input", function () {
-          $("#modelTtsSpeedValue").text($(this).val() + "x");
-        });
+      });
 
-        // Add Model
-        $("#add-model-form").on("submit", function (e) {
-          e.preventDefault();
-          $("#add-model-result").hide();
-          $("#usage-code").hide();
-          $.post("/api/add_model", $(this).serialize(), function (data) {
-            if (data.error) {
-              alert("Error: " + data.error);
-            } else {
-              $("#add-model-success").text(data.message);
-              $("#add-model-result").show();
-              $("#usage-code").text(data.usage_code).show();
-              loadModelsForDropdown("#model");
-              loadModelsForDropdown("#delete_model_name");
-              loadModelsForDropdown("#code_model_name");
-            }
-          }).fail(function (xhr) {
-            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-          });
+      // Delete Model
+      $("#delete-model-form").on("submit", function (e) {
+        e.preventDefault();
+        $("#delete-model-result").hide();
+        $.post("/api/delete_model", $(this).serialize(), function (data) {
+          if (data.error) {
+            alert("Error: " + data.error);
+          } else {
+            $("#delete-model-success").text(data.message);
+            $("#delete-model-result").show();
+            loadModelsForDropdown("#model");
+            loadModelsForDropdown("#delete_model_name");
+            loadModelsForDropdown("#code_model_name");
+          }
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
         });
+      });
 
-        // Delete Model
-        $("#delete-model-form").on("submit", function (e) {
-          e.preventDefault();
-          $("#delete-model-result").hide();
-          $.post("/api/delete_model", $(this).serialize(), function (data) {
-            if (data.error) {
-              alert("Error: " + data.error);
-            } else {
-              $("#delete-model-success").text(data.message);
-              $("#delete-model-result").show();
-              loadModelsForDropdown("#model");
-              loadModelsForDropdown("#delete_model_name");
-              loadModelsForDropdown("#code_model_name");
-            }
-          }).fail(function (xhr) {
-            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-          });
+      // Get Client Code
+      $("#get-code-form").on("submit", function (e) {
+        e.preventDefault();
+        $("#get-code-result").hide();
+        $.post("/api/get_client_code", $(this).serialize(), function (data) {
+          if (data.error) {
+            alert("Error: " + data.error);
+          } else {
+            $("#client-code-display").text(data.usage_code);
+            $("#get-code-result").show();
+          }
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
         });
+      });
 
-        // Get Client Code
-        $("#get-code-form").on("submit", function (e) {
-          e.preventDefault();
-          $("#get-code-result").hide();
-          $.post("/api/get_client_code", $(this).serialize(), function (data) {
-            if (data.error) {
-              alert("Error: " + data.error);
-            } else {
-              $("#client-code-display").text(data.usage_code);
-              $("#get-code-result").show();
-            }
-          }).fail(function (xhr) {
-            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-          });
-        });
-
-        // Server start, stop, logs
-        $("#start-server").click(function () {
-          $("#server-result").hide();
-          $("#server-logs-box").hide();
-          $.post("/api/start_server", {}, function (data) {
-            if (data.error) {
-              $("#server-message").text(data.error);
-              if (data.logs) {
-                $("#server-logs-box").text(data.logs).show();
-              }
-              $("#server-result").show();
-            } else {
-              $("#server-message").text(data.message);
-              $("#server-result").show();
-            }
-          }).fail(function (xhr) {
-            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-          });
-        });
-
-        $("#stop-server").click(function () {
-          $("#server-result").hide();
-          $("#server-logs-box").hide();
-          $.post("/api/stop_server", {}, function (data) {
-            if (data.error) {
-              alert("Error: " + data.error);
-            } else {
-              $("#server-message").text(data.message);
-              $("#server-result").show();
-            }
-          }).fail(function (xhr) {
-            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-          });
-        });
-
-        $("#logs-server").click(function () {
-          $("#server-result").hide();
-          $.get("/api/get_server_logs", function (data) {
+      // Server Start
+      $("#start-server").click(function () {
+        $("#server-result").hide();
+        $("#server-logs-box").hide();
+        $.post("/api/start_server", {}, function (data) {
+          if (data.error) {
+            $("#server-message").text(data.error);
             if (data.logs) {
               $("#server-logs-box").text(data.logs).show();
-            } else {
-              $("#server-logs-box").text("No logs available.").show();
             }
-          }).fail(function (xhr) {
-            const errMsg =
-              xhr.responseJSON?.error ||
-              xhr.statusText ||
-              "Error retrieving logs";
-            $("#server-logs-box").text(errMsg).show();
-          });
+            $("#server-result").show();
+          } else {
+            $("#server-message").text(data.message);
+            $("#server-result").show();
+          }
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      // Server Stop
+      $("#stop-server").click(function () {
+        $("#server-result").hide();
+        $("#server-logs-box").hide();
+        $.post("/api/stop_server", {}, function (data) {
+          if (data.error) {
+            alert("Error: " + data.error);
+          } else {
+            $("#server-message").text(data.message);
+            $("#server-result").show();
+          }
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      });
+
+      // Server Logs
+      $("#logs-server").click(function () {
+        $("#server-result").hide();
+        $.get("/api/get_server_logs", function (data) {
+          if (data.logs) {
+            $("#server-logs-box").text(data.logs).show();
+          } else {
+            $("#server-logs-box").text("No logs available.").show();
+          }
+        }).fail(function (xhr) {
+          const errMsg =
+            xhr.responseJSON?.error ||
+            xhr.statusText ||
+            "Error retrieving logs";
+          $("#server-logs-box").text(errMsg).show();
         });
       });
     </script>
