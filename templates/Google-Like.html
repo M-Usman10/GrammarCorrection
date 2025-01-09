@@ -1,935 +1,1346 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LLM Playground (Single Page)</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Playground (Single Page)</title>
 
-  <!-- Bootstrap CSS -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
-  <!-- Bootstrap Icons (for mic, check, x, and volume icons) -->
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
-  />
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Bootstrap Icons (for mic, check, x, and volume icons) -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
+    />
 
-  <style>
-    body {
-      background-color: #fafafa;
-      font-family: 'Roboto', sans-serif;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      color: #444;
-    }
-    .container {
-      flex: 1;
-      margin-top: 2rem;
-      margin-bottom: 2rem;
-    }
-    footer {
-      background-color: #f1f1f1;
-      color: #666;
-      text-align: center;
-      padding: 1rem 0;
-      margin-top: auto;
-    }
-    .usage-pre {
-      background: #f8f9fa;
-      border: 1px solid #ddd;
-      padding: 0.75rem;
-      border-radius: 4px;
-      max-height: 300px;
-      overflow: auto;
-      font-family: monospace;
-      white-space: pre;
-    }
-    .logs-box {
-      background: #212121;
-      color: #eee;
-      border-radius: 4px;
-      padding: 0.75rem;
-      max-height: 600px;
-      overflow-y: auto;
-      font-family: monospace;
-      white-space: pre;
-    }
-    .mic-btn {
-      background-image: linear-gradient(to right, #4285f4, #ea4335, #fbbc05, #34a853);
-      color: #fff;
-      border: none;
-    }
-    .mic-btn i {
-      font-size: 1.2rem;
-    }
-    .speaker-btn {
-      background-color: #6c757d;
-      color: #fff;
-      border: none;
-    }
-    .recording-indicator {
-      font-weight: bold;
-      color: #d9534f;
-    }
-    .hidden {
-      display: none !important;
-    }
-    .audio-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-top: 0.5rem;
-    }
-    .audio-controls button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 2.5rem;
-      height: 2.5rem;
-    }
-    .audio-controls span {
-      white-space: nowrap;
-      font-size: 0.9rem;
-      width: 6rem;
-      text-align: center;
-    }
-    /* Custom whisper audio styles */
-    .whisperAudio {
-      margin-top:15px;
-      width:100%;
-    }
-  </style>
-</head>
-<body>
-  <!-- Navbar with Tabs -->
-  <nav class="navbar navbar-expand-lg" style="background-image: linear-gradient(to right, #4285f4, #ea4335, #fbbc05, #34a853);">
+    <style>
+      body {
+        background-color: #fafafa;
+        font-family: "Roboto", sans-serif;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        color: #444;
+      }
+      .container {
+        flex: 1;
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+      }
+      footer {
+        background-color: #f1f1f1;
+        color: #666;
+        text-align: center;
+        padding: 1rem 0;
+        margin-top: auto;
+      }
+      .usage-pre {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        padding: 0.75rem;
+        border-radius: 4px;
+        max-height: 300px;
+        overflow: auto;
+        font-family: monospace;
+        white-space: pre;
+      }
+      .logs-box {
+        background: #212121;
+        color: #eee;
+        border-radius: 4px;
+        padding: 0.75rem;
+        max-height: 600px;
+        overflow-y: auto;
+        font-family: monospace;
+        white-space: pre;
+      }
+      .mic-btn {
+        background-image: linear-gradient(
+          to right,
+          #4285f4,
+          #ea4335,
+          #fbbc05,
+          #34a853
+        );
+        color: #fff;
+        border: none;
+      }
+      .mic-btn i {
+        font-size: 1.2rem;
+      }
+      .speaker-btn {
+        background-color: #6c757d;
+        color: #fff;
+        border: none;
+      }
+      .recording-indicator {
+        font-weight: bold;
+        color: #d9534f;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .audio-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+        background: #f1f3f4;
+        padding: 15px 10px;
+        border-radius: 30px;
+      }
+      .audio-controls button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+      }
+
+      .form-range {
+        -webkit-appearance: none; /* Removes default styles */
+        appearance: none;
+        width: 100%; /* Set the width of the range slider */
+        height: 8px; /* Height of the track */
+        background: #ddd; /* Default track color */
+        border-radius: 4px; /* Rounded edges */
+        outline: none; /* Removes outline when focused */
+        cursor: pointer;
+      }
+
+      /* Track (default) */
+      .form-range::-webkit-slider-runnable-track {
+        background: black; /* Default track color */
+        height: 8px;
+        border-radius: 4px;
+      }
+
+      .form-range::-webkit-range-progress {
+        background: gray; /* Progress color */
+        height: 8px;
+        border-radius: 4px;
+      }
+      /* Track (Firefox) */
+      .form-range::-moz-range-track {
+        background: black;
+        height: 8px;
+        border-radius: 4px;
+      }
+
+      /* Thumb styling */
+      .form-range::-webkit-slider-thumb {
+        -webkit-appearance: none; /* Removes default styles */
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: gray; /* Thumb color */
+        border-radius: 50%; /* Circular thumb */
+        cursor: pointer;
+        box-shadow: none;
+      }
+
+      .form-range::-moz-range-thumb {
+        -webkit-appearance: none; /* Removes default styles */
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: gray; /* Thumb color */
+        border-radius: 50%; /* Circular thumb */
+        cursor: pointer;
+        box-shadow: none;
+      }
+
+      /* Progress (before the thumb) */
+      .form-range::-webkit-slider-runnable-track {
+        background: black;
+      }
+
+      .form-range::-moz-range-progress {
+        background: gray; /* Progress color */
+        height: 8px;
+        border-radius: 4px;
+      }
+
+      /* Set custom property for progress percentage */
+      .form-range {
+        --progress-percent: 50%;
+      }
+
+      /* Update progress on input */
+      .form-range:active,
+      .form-range:focus {
+        outline: none;
+      }
+
+      .audio-controls span {
+        white-space: nowrap;
+        font-size: 0.9rem;
+        width: 6rem;
+        text-align: center;
+      }
+      /* Custom whisper audio styles */
+      .whisperAudio {
+        margin-top: 15px;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navbar with Tabs -->
+    <nav
+      class="navbar navbar-expand-lg"
+      style="
+        background-image: linear-gradient(
+          to right,
+          #4285f4,
+          #ea4335,
+          #fbbc05,
+          #34a853
+        );
+      "
+    >
+      <div class="container">
+        <a class="navbar-brand text-white fw-bold" href="#">LLM Playground</a>
+      </div>
+    </nav>
+
+    <!-- Page Content -->
     <div class="container">
-      <a class="navbar-brand text-white fw-bold" href="#">LLM Playground</a>
-    </div>
-  </nav>
+      <!-- Tabs -->
+      <ul class="nav nav-tabs" id="mainTab" role="tablist">
+        <li class="nav-item">
+          <a
+            class="nav-link active"
+            id="home-tab"
+            data-bs-toggle="tab"
+            href="#home"
+            role="tab"
+            aria-controls="home"
+            aria-selected="true"
+            >Home</a
+          >
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link"
+            id="manage-tab"
+            data-bs-toggle="tab"
+            href="#manageModels"
+            role="tab"
+            aria-controls="manageModels"
+            aria-selected="false"
+            >Manage Models</a
+          >
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link"
+            id="audiocontrols-tab"
+            data-bs-toggle="tab"
+            href="#audioControls"
+            role="tab"
+            aria-controls="audioControls"
+            aria-selected="false"
+            >Audio Controls</a
+          >
+        </li>
+        <li class="nav-item">
+          <a
+            class="nav-link"
+            id="server-tab"
+            data-bs-toggle="tab"
+            href="#serverControl"
+            role="tab"
+            aria-controls="serverControl"
+            aria-selected="false"
+            >Server Control</a
+          >
+        </li>
+      </ul>
 
-  <!-- Page Content -->
-  <div class="container">
-    <!-- Tabs -->
-    <ul class="nav nav-tabs" id="mainTab" role="tablist">
-      <li class="nav-item">
-        <a class="nav-link active" id="home-tab" data-bs-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="true">Home</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" id="manage-tab" data-bs-toggle="tab" href="#manageModels" role="tab" aria-controls="manageModels" aria-selected="false">Manage Models</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" id="audiocontrols-tab" data-bs-toggle="tab" href="#audioControls" role="tab" aria-controls="audioControls" aria-selected="false">Audio Controls</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" id="server-tab" data-bs-toggle="tab" href="#serverControl" role="tab" aria-controls="serverControl" aria-selected="false">Server Control</a>
-      </li>
-    </ul>
-
-    <div class="tab-content" id="mainTabContent">
-      <!-- HOME TAB (Inference) -->
-      <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
-        <div class="row justify-content-center g-4 mt-3">
-          <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header text-center bg-white">
-                <h5 class="mb-0">Triton Model Inference</h5>
-              </div>
-              <div class="card-body">
-                <!-- Mic + Normal Query Container -->
-                <form id="model-form">
-                  <div class="mb-3">
-                    <label for="model" class="form-label">Select Model</label>
-                    <select class="form-select" id="model" name="model" required>
-                      <option value="" disabled selected>Loading models...</option>
-                    </select>
-                  </div>
-                  <div class="mb-3" id="textQueryContainer">
-                    <label for="query" class="form-label">Enter Query</label>
-                    <textarea class="form-control" id="query" name="query" rows="3" required></textarea>
-                  </div>
-                  <button type="submit" class="btn btn-primary w-100" id="submitQueryBtn">Submit</button>
-                </form>
-
-                <!-- Whisper Transcription Container -->
-                <div id="whisper-container" class="mt-4" style="display:none;">
-                  <h6>Whisper Transcription</h6>
-                  <textarea class="form-control" id="whisper-transcription-editable" rows="3"></textarea>
-
-                  <!-- Buttons: Generate Audio (left) + Submit for Inference (right) -->
-                  <div class="mt-2 d-flex align-items-center justify-content-start gap-2">
-                    <button id="playWhisperTTSBtn" class="btn speaker-btn">
-                      <i class="bi bi-volume-up"></i> Generate Audio
-                    </button>
-                    <button id="whisperInferenceBtn" class="btn btn-primary ms-auto">Submit for Inference</button>
-                  </div>
-
-                  <!-- Audio Player for Whisper TTS result -->
-                  <audio id="whisperAudio" class="hidden whisperAudio" preload="metadata"></audio>
-                  <div class="audio-controls" id="whisperAudioControls" style="display:none;">
-                    <button id="whisperPlayPauseBtn" class="btn btn-primary btn-sm">
-                      <i class="bi bi-play-fill"></i>
-                    </button>
-                    <span id="whisperAudioTime">00:00 / 00:00</span>
-                    <input type="range" min="0" max="100" step="1" value="0"
-                           id="whisperAudioProgress" class="form-range"/>
-                  </div>
+      <div class="tab-content" id="mainTabContent">
+        <!-- HOME TAB (Inference) -->
+        <div
+          class="tab-pane fade show active"
+          id="home"
+          role="tabpanel"
+          aria-labelledby="home-tab"
+        >
+          <div class="row justify-content-center g-4 mt-3">
+            <div class="col-md-8">
+              <div class="card border-0 shadow-sm">
+                <div class="card-header text-center bg-white">
+                  <h5 class="mb-0">Triton Model Inference</h5>
                 </div>
-
-                <!-- Model Response Container -->
-                <div id="response-container" class="mt-4" style="display:none;">
-                  <h6>Model Response</h6>
-                  <div class="alert alert-secondary" id="response"></div>
-                  <!-- Audio Player for Model TTS result -->
-                  <div class="mt-3">
-                    <button id="playResponseTTSBtn" class="btn speaker-btn">
-                      <i class="bi bi-volume-up"></i> Generate Audio
+                <div class="card-body">
+                  <!-- Mic + Normal Query Container -->
+                  <form id="model-form">
+                    <div class="mb-3">
+                      <label for="model" class="form-label">Select Model</label>
+                      <select
+                        class="form-select"
+                        id="model"
+                        name="model"
+                        required
+                      >
+                        <option value="" disabled selected>
+                          Loading models...
+                        </option>
+                      </select>
+                    </div>
+                    <div class="mb-3" id="textQueryContainer">
+                      <label for="query" class="form-label">Enter Query</label>
+                      <textarea
+                        class="form-control"
+                        id="query"
+                        name="query"
+                        rows="3"
+                        required
+                      ></textarea>
+                    </div>
+                    <button
+                      type="submit"
+                      class="btn btn-primary w-100"
+                      id="submitQueryBtn"
+                    >
+                      Submit
                     </button>
-                    <!-- Hidden audio element + custom controls -->
-                    <audio id="responseAudio" preload="metadata" style="display:none;"></audio>
-                    <div class="audio-controls" id="responseAudioControls" style="display:none;">
-                      <button id="responsePlayPauseBtn" class="btn btn-primary btn-sm">
+                  </form>
+
+                  <!-- Whisper Transcription Container -->
+                  <div
+                    id="whisper-container"
+                    class="mt-4"
+                    style="display: none"
+                  >
+                    <h6>Whisper Transcription</h6>
+                    <textarea
+                      class="form-control"
+                      id="whisper-transcription-editable"
+                      rows="3"
+                    ></textarea>
+
+                    <!-- Buttons: Generate Audio (left) + Submit for Inference (right) -->
+                    <div
+                      class="mt-2 d-flex align-items-center justify-content-start gap-2"
+                    >
+                      <button id="playWhisperTTSBtn" class="btn speaker-btn">
+                        <i class="bi bi-volume-up"></i> Generate Audio
+                      </button>
+                      <button
+                        id="whisperInferenceBtn"
+                        class="btn btn-primary ms-auto"
+                      >
+                        Submit for Inference
+                      </button>
+                    </div>
+
+                    <!-- Audio Player for Whisper TTS result -->
+                    <audio
+                      id="whisperAudio"
+                      class="hidden whisperAudio"
+                      preload="metadata"
+                    ></audio>
+                    <div
+                      class="audio-controls"
+                      id="whisperAudioControls"
+                      style="display: none"
+                    >
+                      <button id="whisperPlayPauseBtn" class="border-0">
                         <i class="bi bi-play-fill"></i>
                       </button>
-                      <span id="responseAudioTime">00:00 / 00:00</span>
-                      <input type="range" min="0" max="100" step="1" value="0"
-                             id="responseAudioProgress" class="form-range"/>
+                      <span id="whisperAudioTime">00:00 / 00:00</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value="0"
+                        id="whisperAudioProgress"
+                        class="form-range"
+                      />
                     </div>
                   </div>
-                </div>
 
-                <!-- Microphone Record Button (below transcription/response) -->
-                <div class="text-center mt-4">
-                  <button id="startRecordingBtn" class="btn mic-btn">
-                    <i class="bi bi-mic"></i> Record
-                  </button>
-                </div>
+                  <!-- Model Response Container -->
+                  <div
+                    id="response-container"
+                    class="mt-4"
+                    style="display: none"
+                  >
+                    <h6>Model Response</h6>
+                    <div class="alert alert-secondary" id="response"></div>
+                    <!-- Audio Player for Model TTS result -->
+                    <div class="mt-3">
+                      <button id="playResponseTTSBtn" class="btn speaker-btn">
+                        <i class="bi bi-volume-up"></i> Generate Audio
+                      </button>
+                      <!-- Hidden audio element + custom controls -->
+                      <audio
+                        id="responseAudio"
+                        preload="metadata"
+                        style="display: none"
+                      ></audio>
+                      <div
+                        class="audio-controls"
+                        id="responseAudioControls"
+                        style="display: none"
+                      >
+                        <button
+                          id="responsePlayPauseBtn"
+                          class="btn btn-primary btn-sm"
+                        >
+                          <i class="bi bi-play-fill"></i>
+                        </button>
+                        <span id="responseAudioTime">00:00 / 00:00</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value="0"
+                          id="responseAudioProgress"
+                          class="form-range"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                <!-- Recording UI (hidden initially) -->
-                <div id="recordingUI" class="mt-4 hidden text-center">
-                  <p class="recording-indicator" id="recordingIndicator" style="display:none;">Recording...</p>
-                  <!-- Timer element -->
-                  <p id="record-timer" style="font-size: 1.2rem; margin-bottom: 1rem;">00:00</p>
-
-                  <div class="d-flex justify-content-center gap-3">
-                    <button id="cancelRecordingBtn" class="btn btn-secondary">
-                      <i class="bi bi-x-lg"></i>
+                  <!-- Microphone Record Button (below transcription/response) -->
+                  <div class="text-center mt-4">
+                    <button id="startRecordingBtn" class="btn mic-btn">
+                      <i class="bi bi-mic"></i> Record
                     </button>
-                    <button id="confirmRecordingBtn" class="btn btn-success">
-                      <i class="bi bi-check-lg"></i>
+                  </div>
+
+                  <!-- Recording UI (hidden initially) -->
+                  <div id="recordingUI" class="mt-4 hidden text-center">
+                    <p
+                      class="recording-indicator"
+                      id="recordingIndicator"
+                      style="display: none"
+                    >
+                      Recording...
+                    </p>
+                    <!-- Timer element -->
+                    <p
+                      id="record-timer"
+                      style="font-size: 1.2rem; margin-bottom: 1rem"
+                    >
+                      00:00
+                    </p>
+
+                    <div class="d-flex justify-content-center gap-3">
+                      <button id="cancelRecordingBtn" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i>
+                      </button>
+                      <button id="confirmRecordingBtn" class="btn btn-success">
+                        <i class="bi bi-check-lg"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Loader -->
+                  <div
+                    id="loader"
+                    class="mt-3 text-center"
+                    style="display: none"
+                  >
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Processing your request...</p>
+                  </div>
+                </div>
+                <!-- card-body -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- end HOME TAB -->
+
+        <!-- MANAGE MODELS TAB -->
+        <div
+          class="tab-pane fade"
+          id="manageModels"
+          role="tabpanel"
+          aria-labelledby="manage-tab"
+        >
+          <div class="row justify-content-center g-4 mt-3">
+            <div class="col-md-8">
+              <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white text-center">
+                  <h5 class="mb-0">Manage Models</h5>
+                </div>
+                <div class="card-body">
+                  <!-- Add Model -->
+                  <div class="mb-4">
+                    <button
+                      class="btn btn-success"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#collapseAddModel"
+                    >
+                      Add New Model
+                    </button>
+                    <div class="collapse mt-3" id="collapseAddModel">
+                      <form id="add-model-form">
+                        <div class="mb-3">
+                          <label for="new_model_name" class="form-label"
+                            >New Model Name</label
+                          >
+                          <input
+                            type="text"
+                            class="form-control"
+                            id="new_model_name"
+                            name="new_model_name"
+                            required
+                          />
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                          Create Model
+                        </button>
+                      </form>
+                      <div
+                        id="add-model-result"
+                        class="mt-3"
+                        style="display: none"
+                      >
+                        <div
+                          class="alert alert-success"
+                          id="add-model-success"
+                        ></div>
+                        <pre
+                          class="usage-pre mt-2"
+                          id="usage-code"
+                          style="display: none"
+                        ></pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Delete Model -->
+                  <div class="mb-4">
+                    <button
+                      class="btn btn-danger"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#collapseDeleteModel"
+                    >
+                      Delete Model
+                    </button>
+                    <div class="collapse mt-3" id="collapseDeleteModel">
+                      <form id="delete-model-form">
+                        <div class="mb-3">
+                          <label for="delete_model_name" class="form-label"
+                            >Select Model Folder</label
+                          >
+                          <select
+                            class="form-select"
+                            id="delete_model_name"
+                            name="delete_model_name"
+                            required
+                          >
+                            <option value="" disabled selected>
+                              Loading models...
+                            </option>
+                          </select>
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100">
+                          Delete Model
+                        </button>
+                      </form>
+                      <div
+                        id="delete-model-result"
+                        class="mt-3"
+                        style="display: none"
+                      >
+                        <div
+                          class="alert alert-success"
+                          id="delete-model-success"
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Get Client Code for Existing Models -->
+                  <div class="mb-4">
+                    <button
+                      class="btn btn-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#collapseGetClientCode"
+                    >
+                      Get Client Code
+                    </button>
+                    <div class="collapse mt-3" id="collapseGetClientCode">
+                      <form id="get-code-form">
+                        <div class="mb-3">
+                          <label for="code_model_name" class="form-label"
+                            >Select Model Folder</label
+                          >
+                          <select
+                            class="form-select"
+                            id="code_model_name"
+                            name="folder_name"
+                            required
+                          >
+                            <option value="" disabled selected>
+                              Loading models...
+                            </option>
+                          </select>
+                        </div>
+                        <button type="submit" class="btn btn-info w-100">
+                          Get Code
+                        </button>
+                      </form>
+                      <div
+                        id="get-code-result"
+                        class="mt-3"
+                        style="display: none"
+                      >
+                        <pre class="usage-pre" id="client-code-display"></pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- card-body -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- end MANAGE MODELS TAB -->
+
+        <!-- AUDIO CONTROLS TAB -->
+        <div
+          class="tab-pane fade"
+          id="audioControls"
+          role="tabpanel"
+          aria-labelledby="audiocontrols-tab"
+        >
+          <div class="row justify-content-center g-4 mt-3">
+            <div class="col-md-8">
+              <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white text-center">
+                  <h5 class="mb-0">Audio Controls</h5>
+                </div>
+                <div class="card-body">
+                  <!-- Whisper TTS controls -->
+                  <h6 class="fw-bold">Whisper TTS Settings</h6>
+                  <div class="mb-3">
+                    <label for="whisperTtsSpeakerSelect" class="form-label"
+                      >Voice</label
+                    >
+                    <select class="form-select" id="whisperTtsSpeakerSelect">
+                      <!-- Female Voices -->
+                      <optgroup label="Female Voices">
+                        <option value="p240">Dawn</option>
+                        <option value="p244">Ember</option>
+                        <option value="p245">Willow</option>
+                        <option value="p246">Rose</option>
+                        <option value="p247">Star</option>
+                        <option value="p268">Aura</option>
+                        <option value="p294">Juniper</option>
+                        <option value="p306">Breeze</option>
+                        <option value="p308">Nova</option>
+                        <option value="p316">Echo</option>
+                      </optgroup>
+                      <!-- Male Voices -->
+                      <optgroup label="Male Voices">
+                        <option value="p230">Cove</option>
+                        <option value="p233">Sol</option>
+                        <option value="p251">Spruce</option>
+                        <option value="p286">Arbor</option>
+                        <option value="p287">Ash</option>
+                        <option value="p302">Slate</option>
+                        <option value="p307">Drift</option>
+                        <option value="p312">River</option>
+                        <option value="p317">Orion</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="whisperTtsSpeedRange" class="form-label"
+                      >Playback Speed</label
+                    >
+                    <input
+                      type="range"
+                      class="form-range"
+                      id="whisperTtsSpeedRange"
+                      min="0.5"
+                      max="2"
+                      step="0.1"
+                      value="1"
+                    />
+                    <div class="text-center">
+                      <span id="whisperTtsSpeedValue">1.0x</span>
+                    </div>
+                  </div>
+                  <hr />
+                  <!-- Model TTS controls -->
+                  <h6 class="fw-bold">Model TTS Settings</h6>
+                  <div class="mb-3">
+                    <label for="modelTtsSpeakerSelect" class="form-label"
+                      >Voice</label
+                    >
+                    <select class="form-select" id="modelTtsSpeakerSelect">
+                      <!-- Female Voices -->
+                      <optgroup label="Female Voices">
+                        <option value="p240">Dawn</option>
+                        <option value="p244">Ember</option>
+                        <option value="p245">Willow</option>
+                        <option value="p246">Rose</option>
+                        <option value="p247">Star</option>
+                        <option value="p268">Aura</option>
+                        <option value="p294">Juniper</option>
+                        <option value="p306">Breeze</option>
+                        <option value="p308">Nova</option>
+                        <option value="p316">Echo</option>
+                      </optgroup>
+                      <!-- Male Voices -->
+                      <optgroup label="Male Voices">
+                        <option value="p230">Cove</option>
+                        <option value="p233">Sol</option>
+                        <option value="p251">Spruce</option>
+                        <option value="p286">Arbor</option>
+                        <option value="p287">Ash</option>
+                        <option value="p302">Slate</option>
+                        <option value="p307">Drift</option>
+                        <option value="p312">River</option>
+                        <option value="p317">Orion</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="modelTtsSpeedRange" class="form-label"
+                      >Playback Speed</label
+                    >
+                    <input
+                      type="range"
+                      class="form-range"
+                      id="modelTtsSpeedRange"
+                      min="0.5"
+                      max="2"
+                      step="0.1"
+                      value="1"
+                    />
+                    <div class="text-center">
+                      <span id="modelTtsSpeedValue">1.0x</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- card-body -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- end AUDIO CONTROLS TAB -->
+
+        <!-- SERVER CONTROL TAB -->
+        <div
+          class="tab-pane fade"
+          id="serverControl"
+          role="tabpanel"
+          aria-labelledby="server-tab"
+        >
+          <div class="row justify-content-center g-4 mt-3">
+            <div class="col-md-8">
+              <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white text-center">
+                  <h5 class="mb-0">Triton Server Control</h5>
+                </div>
+                <div class="card-body">
+                  <div class="d-grid gap-2">
+                    <button id="start-server" class="btn btn-success">
+                      Start Server
+                    </button>
+                    <button id="stop-server" class="btn btn-danger">
+                      Stop Server
+                    </button>
+                    <button id="logs-server" class="btn btn-dark">
+                      Get Triton Logs
                     </button>
                   </div>
-                </div>
-
-                <!-- Loader -->
-                <div id="loader" class="mt-3 text-center" style="display:none;">
-                  <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
+                  <!-- Server result messages -->
+                  <div id="server-result" class="mt-3" style="display: none">
+                    <div class="alert alert-info" id="server-message"></div>
                   </div>
-                  <p class="mt-2">Processing your request...</p>
+                  <!-- Triton logs box -->
+                  <div
+                    id="server-logs-box"
+                    class="logs-box mt-3"
+                    style="display: none"
+                  ></div>
                 </div>
-              </div> <!-- card-body -->
-            </div>
-          </div>
-        </div>
-      </div> <!-- end HOME TAB -->
-
-      <!-- MANAGE MODELS TAB -->
-      <div class="tab-pane fade" id="manageModels" role="tabpanel" aria-labelledby="manage-tab">
-        <div class="row justify-content-center g-4 mt-3">
-          <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white text-center">
-                <h5 class="mb-0">Manage Models</h5>
+                <!-- card-body -->
               </div>
-              <div class="card-body">
-                <!-- Add Model -->
-                <div class="mb-4">
-                  <button class="btn btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAddModel">
-                    Add New Model
-                  </button>
-                  <div class="collapse mt-3" id="collapseAddModel">
-                    <form id="add-model-form">
-                      <div class="mb-3">
-                        <label for="new_model_name" class="form-label">New Model Name</label>
-                        <input type="text" class="form-control" id="new_model_name" name="new_model_name" required />
-                      </div>
-                      <button type="submit" class="btn btn-primary w-100">Create Model</button>
-                    </form>
-                    <div id="add-model-result" class="mt-3" style="display:none;">
-                      <div class="alert alert-success" id="add-model-success"></div>
-                      <pre class="usage-pre mt-2" id="usage-code" style="display:none;"></pre>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Delete Model -->
-                <div class="mb-4">
-                  <button class="btn btn-danger" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDeleteModel">
-                    Delete Model
-                  </button>
-                  <div class="collapse mt-3" id="collapseDeleteModel">
-                    <form id="delete-model-form">
-                      <div class="mb-3">
-                        <label for="delete_model_name" class="form-label">Select Model Folder</label>
-                        <select class="form-select" id="delete_model_name" name="delete_model_name" required>
-                          <option value="" disabled selected>Loading models...</option>
-                        </select>
-                      </div>
-                      <button type="submit" class="btn btn-danger w-100">Delete Model</button>
-                    </form>
-                    <div id="delete-model-result" class="mt-3" style="display:none;">
-                      <div class="alert alert-success" id="delete-model-success"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Get Client Code for Existing Models -->
-                <div class="mb-4">
-                  <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGetClientCode">
-                    Get Client Code
-                  </button>
-                  <div class="collapse mt-3" id="collapseGetClientCode">
-                    <form id="get-code-form">
-                      <div class="mb-3">
-                        <label for="code_model_name" class="form-label">Select Model Folder</label>
-                        <select class="form-select" id="code_model_name" name="folder_name" required>
-                          <option value="" disabled selected>Loading models...</option>
-                        </select>
-                      </div>
-                      <button type="submit" class="btn btn-info w-100">Get Code</button>
-                    </form>
-                    <div id="get-code-result" class="mt-3" style="display:none;">
-                      <pre class="usage-pre" id="client-code-display"></pre>
-                    </div>
-                  </div>
-                </div>
-              </div> <!-- card-body -->
             </div>
           </div>
         </div>
-      </div> <!-- end MANAGE MODELS TAB -->
+        <!-- /serverControl tab -->
+      </div>
+      <!-- /tab-content -->
+    </div>
+    <!-- /container -->
 
-      <!-- AUDIO CONTROLS TAB -->
-      <div class="tab-pane fade" id="audioControls" role="tabpanel" aria-labelledby="audiocontrols-tab">
-        <div class="row justify-content-center g-4 mt-3">
-          <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white text-center">
-                <h5 class="mb-0">Audio Controls</h5>
-              </div>
-              <div class="card-body">
-                <!-- Whisper TTS controls -->
-                <h6 class="fw-bold">Whisper TTS Settings</h6>
-                <div class="mb-3">
-                  <label for="whisperTtsSpeakerSelect" class="form-label">Voice</label>
-                  <select class="form-select" id="whisperTtsSpeakerSelect">
-                    <!-- Female Voices -->
-                    <optgroup label="Female Voices">
-                      <option value="p240">Dawn</option>
-                      <option value="p244">Ember</option>
-                      <option value="p245">Willow</option>
-                      <option value="p246">Rose</option>
-                      <option value="p247">Star</option>
-                      <option value="p268">Aura</option>
-                      <option value="p294">Juniper</option>
-                      <option value="p306">Breeze</option>
-                      <option value="p308">Nova</option>
-                      <option value="p316">Echo</option>
-                    </optgroup>
-                    <!-- Male Voices -->
-                    <optgroup label="Male Voices">
-                      <option value="p230">Cove</option>
-                      <option value="p233">Sol</option>
-                      <option value="p251">Spruce</option>
-                      <option value="p286">Arbor</option>
-                      <option value="p287">Ash</option>
-                      <option value="p302">Slate</option>
-                      <option value="p307">Drift</option>
-                      <option value="p312">River</option>
-                      <option value="p317">Orion</option>
-                    </optgroup>
-                  </select>
-                </div>
-                <div class="mb-3">
-                  <label for="whisperTtsSpeedRange" class="form-label">Playback Speed</label>
-                  <input type="range" class="form-range" id="whisperTtsSpeedRange" min="0.5" max="2" step="0.1" value="1">
-                  <div class="text-center">
-                    <span id="whisperTtsSpeedValue">1.0x</span>
-                  </div>
-                </div>
-                <hr/>
-                <!-- Model TTS controls -->
-                <h6 class="fw-bold">Model TTS Settings</h6>
-                <div class="mb-3">
-                  <label for="modelTtsSpeakerSelect" class="form-label">Voice</label>
-                  <select class="form-select" id="modelTtsSpeakerSelect">
-                    <!-- Female Voices -->
-                    <optgroup label="Female Voices">
-                      <option value="p240">Dawn</option>
-                      <option value="p244">Ember</option>
-                      <option value="p245">Willow</option>
-                      <option value="p246">Rose</option>
-                      <option value="p247">Star</option>
-                      <option value="p268">Aura</option>
-                      <option value="p294">Juniper</option>
-                      <option value="p306">Breeze</option>
-                      <option value="p308">Nova</option>
-                      <option value="p316">Echo</option>
-                    </optgroup>
-                    <!-- Male Voices -->
-                    <optgroup label="Male Voices">
-                      <option value="p230">Cove</option>
-                      <option value="p233">Sol</option>
-                      <option value="p251">Spruce</option>
-                      <option value="p286">Arbor</option>
-                      <option value="p287">Ash</option>
-                      <option value="p302">Slate</option>
-                      <option value="p307">Drift</option>
-                      <option value="p312">River</option>
-                      <option value="p317">Orion</option>
-                    </optgroup>
-                  </select>
-                </div>
-                <div class="mb-3">
-                  <label for="modelTtsSpeedRange" class="form-label">Playback Speed</label>
-                  <input type="range" class="form-range" id="modelTtsSpeedRange" min="0.5" max="2" step="0.1" value="1">
-                  <div class="text-center">
-                    <span id="modelTtsSpeedValue">1.0x</span>
-                  </div>
-                </div>
-              </div> <!-- card-body -->
-            </div>
-          </div>
-        </div>
-      </div> <!-- end AUDIO CONTROLS TAB -->
+    <!-- Footer -->
+    <footer>
+      <small>&copy; 2025 - LLM Playground (Single Page)</small>
+    </footer>
 
-      <!-- SERVER CONTROL TAB -->
-      <div class="tab-pane fade" id="serverControl" role="tabpanel" aria-labelledby="server-tab">
-        <div class="row justify-content-center g-4 mt-3">
-          <div class="col-md-8">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white text-center">
-                <h5 class="mb-0">Triton Server Control</h5>
-              </div>
-              <div class="card-body">
-                <div class="d-grid gap-2">
-                  <button id="start-server" class="btn btn-success">Start Server</button>
-                  <button id="stop-server" class="btn btn-danger">Stop Server</button>
-                  <button id="logs-server" class="btn btn-dark">Get Triton Logs</button>
-                </div>
-                <!-- Server result messages -->
-                <div id="server-result" class="mt-3" style="display:none;">
-                  <div class="alert alert-info" id="server-message"></div>
-                </div>
-                <!-- Triton logs box -->
-                <div id="server-logs-box" class="logs-box mt-3" style="display:none;"></div>
-              </div> <!-- card-body -->
-            </div>
-          </div>
-        </div>
-      </div> <!-- /serverControl tab -->
-    </div> <!-- /tab-content -->
-  </div> <!-- /container -->
+    <!-- JS: jQuery + Bootstrap Bundle + Our scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- Footer -->
-  <footer>
-    <small>&copy; 2025 - LLM Playground (Single Page)</small>
-  </footer>
-
-  <!-- JS: jQuery + Bootstrap Bundle + Our scripts -->
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
-  </script>
-
-  <script>
-    function loadModelsForDropdown(selector) {
-      $.get("/api/list_models", function(data){
-        const sel = $(selector);
-        sel.empty();
-        sel.append(`<option value="" disabled selected>Select a model</option>`);
-        if(data.models && data.models.length){
-          data.models.forEach(m => {
-            // Exclude 'whisper' from the list
-            if(m !== "whisper"){
-              sel.append(`<option value="${m}">${m}</option>`);
-            }
-          });
-        }
-      });
-    }
-
-    let mediaRecorder;
-    let audioChunks = [];
-
-    // Timer-related variables
-    let recordInterval;
-    let recordStartTime;
-
-    // Start the timer
-    function startRecordingTimer() {
-      recordStartTime = Date.now();
-      recordInterval = setInterval(function() {
-        const elapsedMs = Date.now() - recordStartTime;
-        const totalSeconds = Math.floor(elapsedMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        const timeStr = `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
-        document.getElementById("record-timer").textContent = timeStr;
-      }, 1000);
-    }
-
-    // Stop the timer and reset to 00:00
-    function stopRecordingTimer() {
-      clearInterval(recordInterval);
-      document.getElementById("record-timer").textContent = "00:00";
-    }
-
-    $(document).ready(function(){
-      loadModelsForDropdown("#model");
-      loadModelsForDropdown("#delete_model_name");
-      loadModelsForDropdown("#code_model_name");
-
-      // SHIFT+Enter for new line, Enter for submit
-      $("#query").keydown(function(e){
-        if(e.keyCode === 13 && !e.shiftKey) {
-          e.preventDefault();
-          $("#model-form").submit();
-        }
-      });
-      $("#whisper-transcription-editable").keydown(function(e){
-        if(e.keyCode === 13 && !e.shiftKey) {
-          e.preventDefault();
-          $("#whisperInferenceBtn").click();
-        }
-      });
-
-      // Normal text-based query
-      $("#model-form").on("submit", function(e){
-        e.preventDefault();
-        // Hide or reset TTS UI
-        resetModelTtsUI();
-        resetWhisperTtsUI();
-
-        $("#response-container").hide();
-        $("#whisper-container").hide();
-        $("#loader").show();
-
-        $.post("/api/query", $(this).serialize(), function(data){
-          $("#loader").hide();
-          if(data.response){
-            $("#response").text(data.response);
-            $("#response-container").show();
-          } else {
-            $("#response").text("Error: " + data.error);
-            $("#response-container").show();
+    <script>
+      function loadModelsForDropdown(selector) {
+        $.get("/api/list_models", function (data) {
+          const sel = $(selector);
+          sel.empty();
+          sel.append(
+            `<option value="" disabled selected>Select a model</option>`
+          );
+          if (data.models && data.models.length) {
+            data.models.forEach((m) => {
+              // Exclude 'whisper' from the list
+              if (m !== "whisper") {
+                sel.append(`<option value="${m}">${m}</option>`);
+              }
+            });
           }
-        }).fail(function(xhr){
-          $("#loader").hide();
-          $("#response").text("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-          $("#response-container").show();
         });
-      });
+      }
 
-      // Start recording
-      $("#startRecordingBtn").click(async function(){
-        $("#response-container").hide();
-        $("#whisper-container").hide();
-        $("#textQueryContainer").addClass("hidden");
-        $("#submitQueryBtn").addClass("hidden");
-        audioChunks = [];
+      let mediaRecorder;
+      let audioChunks = [];
 
-        // Hide or reset TTS UI
-        resetModelTtsUI();
-        resetWhisperTtsUI();
+      // Timer-related variables
+      let recordInterval;
+      let recordStartTime;
 
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
+      // Start the timer
+      function startRecordingTimer() {
+        recordStartTime = Date.now();
+        recordInterval = setInterval(function () {
+          const elapsedMs = Date.now() - recordStartTime;
+          const totalSeconds = Math.floor(elapsedMs / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          const timeStr = `${String(minutes).padStart(2, "0")}:${String(
+            seconds
+          ).padStart(2, "0")}`;
+          document.getElementById("record-timer").textContent = timeStr;
+        }, 1000);
+      }
 
-          mediaRecorder.onstart = function() {
-            $("#recordingUI").removeClass("hidden");
-            $("#recordingIndicator").show();
-            startRecordingTimer();
-          };
-          mediaRecorder.ondataavailable = (e) => {
-            if(e.data.size > 0) {
-              audioChunks.push(e.data);
-            }
-          };
-          mediaRecorder.start();
+      // Stop the timer and reset to 00:00
+      function stopRecordingTimer() {
+        clearInterval(recordInterval);
+        document.getElementById("record-timer").textContent = "00:00";
+      }
 
-        } catch (err) {
-          $("#recordingUI").addClass("hidden");
-          $("#response").text("Error: Unable to start recording. " + err.message);
-          $("#response-container").show();
-          resetRecordingUI();
-        }
-      });
+      $(document).ready(function () {
+        loadModelsForDropdown("#model");
+        loadModelsForDropdown("#delete_model_name");
+        loadModelsForDropdown("#code_model_name");
 
-      // Cancel recording
-      $("#cancelRecordingBtn").click(function(){
-        if(mediaRecorder && mediaRecorder.state !== 'inactive'){
-          mediaRecorder.stop();
-        }
-        stopRecordingTimer();
-        $("#recordingIndicator").hide();
-        resetRecordingUI();
-      });
+        // SHIFT+Enter for new line, Enter for submit
+        $("#query").keydown(function (e) {
+          if (e.keyCode === 13 && !e.shiftKey) {
+            e.preventDefault();
+            $("#model-form").submit();
+          }
+        });
+        $("#whisper-transcription-editable").keydown(function (e) {
+          if (e.keyCode === 13 && !e.shiftKey) {
+            e.preventDefault();
+            $("#whisperInferenceBtn").click();
+          }
+        });
 
-      // Confirm recording => /api/transcribe
-      $("#confirmRecordingBtn").click(async function(){
-        if(mediaRecorder && mediaRecorder.state !== 'inactive'){
-          mediaRecorder.stop();
-        }
-        mediaRecorder.onstop = async () => {
+        // Normal text-based query
+        $("#model-form").on("submit", function (e) {
+          e.preventDefault();
+          // Hide or reset TTS UI
+          resetModelTtsUI();
+          resetWhisperTtsUI();
+
+          $("#response-container").hide();
+          $("#whisper-container").hide();
           $("#loader").show();
+
+          $.post("/api/query", $(this).serialize(), function (data) {
+            $("#loader").hide();
+            if (data.response) {
+              $("#response").text(data.response);
+              $("#response-container").show();
+            } else {
+              $("#response").text("Error: " + data.error);
+              $("#response-container").show();
+            }
+          }).fail(function (xhr) {
+            $("#loader").hide();
+            $("#response").text(
+              "Error: " + (xhr.responseJSON?.error || xhr.statusText)
+            );
+            $("#response-container").show();
+          });
+        });
+
+        // Start recording
+        $("#startRecordingBtn").click(async function () {
+          $("#response-container").hide();
+          $("#whisper-container").hide();
+          $("#textQueryContainer").addClass("hidden");
+          $("#submitQueryBtn").addClass("hidden");
+          audioChunks = [];
+
+          // Hide or reset TTS UI
+          resetModelTtsUI();
+          resetWhisperTtsUI();
+
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+            });
+            mediaRecorder = new MediaRecorder(stream, {
+              mimeType: "audio/webm; codecs=opus",
+            });
+
+            mediaRecorder.onstart = function () {
+              $("#recordingUI").removeClass("hidden");
+              $("#recordingIndicator").show();
+              startRecordingTimer();
+            };
+            mediaRecorder.ondataavailable = (e) => {
+              if (e.data.size > 0) {
+                audioChunks.push(e.data);
+              }
+            };
+            mediaRecorder.start();
+          } catch (err) {
+            $("#recordingUI").addClass("hidden");
+            $("#response").text(
+              "Error: Unable to start recording. " + err.message
+            );
+            $("#response-container").show();
+            resetRecordingUI();
+          }
+        });
+
+        // Cancel recording
+        $("#cancelRecordingBtn").click(function () {
+          if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
+          }
           stopRecordingTimer();
           $("#recordingIndicator").hide();
+          resetRecordingUI();
+        });
+
+        // Confirm recording => /api/transcribe
+        $("#confirmRecordingBtn").click(async function () {
+          if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
+          }
+          mediaRecorder.onstop = async () => {
+            $("#loader").show();
+            stopRecordingTimer();
+            $("#recordingIndicator").hide();
+            $("#recordingUI").addClass("hidden");
+
+            const blob = new Blob(audioChunks, {
+              type: "audio/webm; codecs=opus",
+            });
+            const formData = new FormData();
+            formData.append("audio_data", blob, "recording.webm");
+
+            $.ajax({
+              url: "/api/transcribe",
+              method: "POST",
+              data: formData,
+              processData: false,
+              contentType: false,
+              success: function (data) {
+                $("#loader").hide();
+                if (data.transcription) {
+                  $("#whisper-transcription-editable").val(data.transcription);
+                  $("#whisper-container").show();
+                } else if (data.error) {
+                  $("#response").text("Error: " + data.error);
+                  $("#response-container").show();
+                }
+                resetRecordingUI();
+              },
+              error: function (xhr) {
+                $("#loader").hide();
+                $("#response").text(
+                  "Error: " + (xhr.responseJSON?.error || xhr.statusText)
+                );
+                $("#response-container").show();
+                resetRecordingUI();
+              },
+            });
+          };
+        });
+
+        function resetRecordingUI() {
+          $("#textQueryContainer").removeClass("hidden");
+          $("#submitQueryBtn").removeClass("hidden");
           $("#recordingUI").addClass("hidden");
+        }
 
-          const blob = new Blob(audioChunks, { type: 'audio/webm; codecs=opus' });
-          const formData = new FormData();
-          formData.append('audio_data', blob, 'recording.webm');
+        // Submit for Inference from Whisper transcription
+        $("#whisperInferenceBtn").click(function () {
+          const input_text = $("#whisper-transcription-editable").val().trim();
+          const model = $("#model").val();
+          if (!model) {
+            alert("Please select a model first.");
+            return;
+          }
+          if (!input_text) {
+            alert("No text to infer. Please transcribe or type something.");
+            return;
+          }
+          // Hide or reset TTS UI
+          resetModelTtsUI();
+          resetWhisperTtsUI();
 
-          $.ajax({
-            url: "/api/transcribe",
-            method: "POST",
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(data) {
+          $("#loader").show();
+          $("#response-container").hide();
+
+          $.post(
+            "/api/query",
+            { model: model, query: input_text },
+            function (data) {
               $("#loader").hide();
-              if(data.transcription){
-                $("#whisper-transcription-editable").val(data.transcription);
-                $("#whisper-container").show();
-              } else if(data.error){
+              if (data.response) {
+                $("#response").text(data.response);
+                $("#response-container").show();
+              } else {
                 $("#response").text("Error: " + data.error);
                 $("#response-container").show();
               }
-              resetRecordingUI();
-            },
-            error: function(xhr){
-              $("#loader").hide();
-              $("#response").text("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-              $("#response-container").show();
-              resetRecordingUI();
             }
+          ).fail(function (xhr) {
+            $("#loader").hide();
+            $("#response").text(
+              "Error: " + (xhr.responseJSON?.error || xhr.statusText)
+            );
+            $("#response-container").show();
           });
-        };
-      });
-
-      function resetRecordingUI() {
-        $("#textQueryContainer").removeClass("hidden");
-        $("#submitQueryBtn").removeClass("hidden");
-        $("#recordingUI").addClass("hidden");
-      }
-
-      // Submit for Inference from Whisper transcription
-      $("#whisperInferenceBtn").click(function(){
-        const input_text = $("#whisper-transcription-editable").val().trim();
-        const model = $("#model").val();
-        if(!model) {
-          alert("Please select a model first.");
-          return;
-        }
-        if(!input_text) {
-          alert("No text to infer. Please transcribe or type something.");
-          return;
-        }
-        // Hide or reset TTS UI
-        resetModelTtsUI();
-        resetWhisperTtsUI();
-
-        $("#loader").show();
-        $("#response-container").hide();
-
-        $.post("/api/query", {model: model, query: input_text}, function(data){
-          $("#loader").hide();
-          if(data.response){
-            $("#response").text(data.response);
-            $("#response-container").show();
-          } else {
-            $("#response").text("Error: " + data.error);
-            $("#response-container").show();
-          }
-        }).fail(function(xhr){
-          $("#loader").hide();
-          $("#response").text("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-          $("#response-container").show();
         });
-      });
 
-      /***********************************************
-       * Audio playback with custom controls (Model) *
-       ***********************************************/
-      const responseAudio = document.getElementById("responseAudio");
-      const responseAudioControls = document.getElementById("responseAudioControls");
-      const responsePlayPauseBtn = document.getElementById("responsePlayPauseBtn");
-      const responseAudioProgress = document.getElementById("responseAudioProgress");
-      const responseAudioTime = document.getElementById("responseAudioTime");
+        /***********************************************
+         * Audio playback with custom controls (Model) *
+         ***********************************************/
+        const responseAudio = document.getElementById("responseAudio");
+        const responseAudioControls = document.getElementById(
+          "responseAudioControls"
+        );
+        const responsePlayPauseBtn = document.getElementById(
+          "responsePlayPauseBtn"
+        );
+        const responseAudioProgress = document.getElementById(
+          "responseAudioProgress"
+        );
+        const responseAudioTime = document.getElementById("responseAudioTime");
 
-      $("#playResponseTTSBtn").click(function(){
-        // Hide or reset existing audio UI first
-        resetModelTtsUI();
+        $("#playResponseTTSBtn").click(function () {
+          // Hide or reset existing audio UI first
+          resetModelTtsUI();
 
-        const text = $("#response").text().trim();
-        if(!text) return;
-        const speaker = $("#modelTtsSpeakerSelect").val();
-        const speed = $("#modelTtsSpeedRange").val();
+          const text = $("#response").text().trim();
+          if (!text) return;
+          const speaker = $("#modelTtsSpeakerSelect").val();
+          const speed = $("#modelTtsSpeedRange").val();
 
-        $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
-          if(data.audio){
-            responseAudioControls.style.display = "flex";
-            responseAudio.style.display = "none"; // Keep hidden <audio>, custom controls
-            responseAudio.src = "data:audio/wav;base64," + data.audio;
-            responseAudio.load();
-            responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-            responseAudioProgress.value = 0;
-            responseAudioTime.textContent = "00:00 / 00:00";
-          }
-        }).fail(function(xhr){
-          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-        });
-      });
-
-      function resetModelTtsUI(){
-        responseAudio.pause();
-        responseAudio.src = "";
-        responseAudioTime.textContent = "00:00 / 00:00";
-        responseAudioProgress.value = 0;
-        responseAudioControls.style.display = "none";
-      }
-
-      responsePlayPauseBtn.addEventListener("click", function(){
-        if(responseAudio.paused || responseAudio.currentTime <= 0){
-          responseAudio.play();
-          responsePlayPauseBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
-        } else {
-          responseAudio.pause();
-          responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-        }
-      });
-
-      responseAudio.addEventListener("timeupdate", function(){
-        if(responseAudio.duration > 0){
-          const percent = (responseAudio.currentTime / responseAudio.duration) * 100;
-          responseAudioProgress.value = percent;
-        }
-        const cur = formatTime(responseAudio.currentTime);
-        const dur = formatTime(responseAudio.duration);
-        responseAudioTime.textContent = `${cur} / ${dur}`;
-      });
-
-      responseAudioProgress.addEventListener("input", function(){
-        if(responseAudio.duration){
-          responseAudio.currentTime = (responseAudioProgress.value / 100) * responseAudio.duration;
-        }
-      });
-
-      responseAudio.addEventListener("ended", function(){
-        responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-      });
-
-      /***********************************************
-       * Audio playback with custom controls (Whisper)
-       ***********************************************/
-      const whisperAudio = document.getElementById("whisperAudio");
-      const whisperAudioControls = document.getElementById("whisperAudioControls");
-      const whisperPlayPauseBtn = document.getElementById("whisperPlayPauseBtn");
-      const whisperAudioProgress = document.getElementById("whisperAudioProgress");
-      const whisperAudioTime = document.getElementById("whisperAudioTime");
-
-      $("#playWhisperTTSBtn").click(function(){
-        // Hide or reset existing audio UI
-        resetWhisperTtsUI();
-
-        const text = $("#whisper-transcription-editable").val().trim();
-        if(!text) return;
-        const speaker = $("#whisperTtsSpeakerSelect").val();
-        const speed = $("#whisperTtsSpeedRange").val();
-
-        $.post("/api/tts", { text: text, speaker: speaker, speed: speed }, function(data){
-          if(data.audio){
-            whisperAudioControls.style.display = "flex";
-            whisperAudio.classList.remove("hidden");
-            whisperAudio.src = "data:audio/wav;base64," + data.audio;
-            whisperAudio.load();
-            whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-            whisperAudioProgress.value = 0;
-            whisperAudioTime.textContent = "00:00 / 00:00";
-          }
-        }).fail(function(xhr){
-          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-        });
-      });
-
-      function resetWhisperTtsUI(){
-        whisperAudio.pause();
-        whisperAudio.src = "";
-        whisperAudioTime.textContent = "00:00 / 00:00";
-        whisperAudioProgress.value = 0;
-        whisperAudioControls.style.display = "none";
-        whisperAudio.classList.add("hidden");
-      }
-
-      whisperPlayPauseBtn.addEventListener("click", function(){
-        if(whisperAudio.paused || whisperAudio.currentTime <= 0){
-          whisperAudio.play();
-          whisperPlayPauseBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
-        } else {
-          whisperAudio.pause();
-          whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-        }
-      });
-
-      whisperAudio.addEventListener("timeupdate", function(){
-        if(whisperAudio.duration > 0){
-          const percent = (whisperAudio.currentTime / whisperAudio.duration) * 100;
-          whisperAudioProgress.value = percent;
-        }
-        const cur = formatTime(whisperAudio.currentTime);
-        const dur = formatTime(whisperAudio.duration);
-        whisperAudioTime.textContent = `${cur} / ${dur}`;
-      });
-
-      whisperAudioProgress.addEventListener("input", function(){
-        if(whisperAudio.duration){
-          whisperAudio.currentTime = (whisperAudioProgress.value / 100) * whisperAudio.duration;
-        }
-      });
-
-      whisperAudio.addEventListener("ended", function(){
-        whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-      });
-
-      // Utility to format time (seconds => mm:ss)
-      function formatTime(seconds) {
-        if(!seconds || isNaN(seconds)){
-          return "00:00";
-        }
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-      }
-
-      // TTS speed label updates
-      $("#whisperTtsSpeedRange").on("input", function(){
-        $("#whisperTtsSpeedValue").text($(this).val() + "x");
-      });
-      $("#modelTtsSpeedRange").on("input", function(){
-        $("#modelTtsSpeedValue").text($(this).val() + "x");
-      });
-
-      // Add Model
-      $("#add-model-form").on("submit", function(e){
-        e.preventDefault();
-        $("#add-model-result").hide();
-        $("#usage-code").hide();
-        $.post("/api/add_model", $(this).serialize(), function(data){
-          if(data.error){
-            alert("Error: " + data.error);
-          } else {
-            $("#add-model-success").text(data.message);
-            $("#add-model-result").show();
-            $("#usage-code").text(data.usage_code).show();
-            loadModelsForDropdown("#model");
-            loadModelsForDropdown("#delete_model_name");
-            loadModelsForDropdown("#code_model_name");
-          }
-        }).fail(function(xhr){
-          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-        });
-      });
-
-      // Delete Model
-      $("#delete-model-form").on("submit", function(e){
-        e.preventDefault();
-        $("#delete-model-result").hide();
-        $.post("/api/delete_model", $(this).serialize(), function(data){
-          if(data.error){
-            alert("Error: " + data.error);
-          } else {
-            $("#delete-model-success").text(data.message);
-            $("#delete-model-result").show();
-            loadModelsForDropdown("#model");
-            loadModelsForDropdown("#delete_model_name");
-            loadModelsForDropdown("#code_model_name");
-          }
-        }).fail(function(xhr){
-          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-        });
-      });
-
-      // Get Client Code
-      $("#get-code-form").on("submit", function(e){
-        e.preventDefault();
-        $("#get-code-result").hide();
-        $.post("/api/get_client_code", $(this).serialize(), function(data){
-          if(data.error){
-            alert("Error: " + data.error);
-          } else {
-            $("#client-code-display").text(data.usage_code);
-            $("#get-code-result").show();
-          }
-        }).fail(function(xhr){
-          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-        });
-      });
-
-      // Server start, stop, logs
-      $("#start-server").click(function(){
-        $("#server-result").hide();
-        $("#server-logs-box").hide();
-        $.post("/api/start_server", {}, function(data){
-          if(data.error){
-            $("#server-message").text(data.error);
-            if(data.logs){
-              $("#server-logs-box").text(data.logs).show();
+          $.post(
+            "/api/tts",
+            { text: text, speaker: speaker, speed: speed },
+            function (data) {
+              if (data.audio) {
+                responseAudioControls.style.display = "flex";
+                responseAudio.style.display = "none"; // Keep hidden <audio>, custom controls
+                responseAudio.src = "data:audio/wav;base64," + data.audio;
+                responseAudio.load();
+                responsePlayPauseBtn.innerHTML =
+                  '<i class="bi bi-play-fill"></i>';
+                responseAudioProgress.value = 0;
+                responseAudioTime.textContent = "00:00 / 00:00";
+              }
             }
-            $("#server-result").show();
-          } else {
-            $("#server-message").text(data.message);
-            $("#server-result").show();
-          }
-        }).fail(function(xhr){
-          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          ).fail(function (xhr) {
+            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          });
         });
-      });
 
-      $("#stop-server").click(function(){
-        $("#server-result").hide();
-        $("#server-logs-box").hide();
-        $.post("/api/stop_server", {}, function(data){
-          if(data.error){
-            alert("Error: " + data.error);
-          } else {
-            $("#server-message").text(data.message);
-            $("#server-result").show();
-          }
-        }).fail(function(xhr){
-          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
-        });
-      });
+        function resetModelTtsUI() {
+          responseAudio.pause();
+          responseAudio.src = "";
+          responseAudioTime.textContent = "00:00 / 00:00";
+          responseAudioProgress.value = 0;
+          responseAudioControls.style.display = "none";
+        }
 
-      $("#logs-server").click(function(){
-        $("#server-result").hide();
-        $.get("/api/get_server_logs", function(data){
-          if(data.logs){
-            $("#server-logs-box").text(data.logs).show();
+        responsePlayPauseBtn.addEventListener("click", function () {
+          if (responseAudio.paused || responseAudio.currentTime <= 0) {
+            responseAudio.play();
+            responsePlayPauseBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
           } else {
-            $("#server-logs-box").text("No logs available.").show();
+            responseAudio.pause();
+            responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
           }
-        }).fail(function(xhr){
-          const errMsg = xhr.responseJSON?.error || xhr.statusText || "Error retrieving logs";
-          $("#server-logs-box").text(errMsg).show();
+        });
+
+        responseAudio.addEventListener("timeupdate", function () {
+          if (responseAudio.duration > 0) {
+            const percent =
+              (responseAudio.currentTime / responseAudio.duration) * 100;
+            responseAudioProgress.value = percent;
+          }
+          const cur = formatTime(responseAudio.currentTime);
+          const dur = formatTime(responseAudio.duration);
+          responseAudioTime.textContent = `${cur} / ${dur}`;
+        });
+
+        responseAudioProgress.addEventListener("input", function () {
+          if (responseAudio.duration) {
+            responseAudio.currentTime =
+              (responseAudioProgress.value / 100) * responseAudio.duration;
+          }
+        });
+
+        responseAudio.addEventListener("ended", function () {
+          responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+        });
+
+        /***********************************************
+         * Audio playback with custom controls (Whisper)
+         ***********************************************/
+        const whisperAudio = document.getElementById("whisperAudio");
+        const whisperAudioControls = document.getElementById(
+          "whisperAudioControls"
+        );
+        const whisperPlayPauseBtn = document.getElementById(
+          "whisperPlayPauseBtn"
+        );
+        const whisperAudioProgress = document.getElementById(
+          "whisperAudioProgress"
+        );
+        const whisperAudioTime = document.getElementById("whisperAudioTime");
+
+        $("#playWhisperTTSBtn").click(function () {
+          whisperAudioControls.style.display = "flex";
+          whisperAudio.classList.remove("hidden");
+          console.log("v  vkrkr r", whisperAudio);
+          whisperAudio.src =
+            "data:audio/wav;base64,UklGRuy3AABXQVZFZm10IBAAAAABAAEAIlYAACJWAAABAAgAZGF0Yci3AACIhISCgH5+enx+gHx4cm5udHp+fHh0cHJ0enx8enx+fn6GiIyMiIaKio6Wmp6goJycnp6coJ6cnJqanqSoqqigmJKSmJygop6ampycmpaOjIiIhoSChoiGgHx2cG5qaGhiYmRkZmRgXFpUUlJUVlhcVlZYWmBgYFxaWlxiZmpsbGxsampubnBwbmxsbnB0cHBub";
+          //
+          console.log("v  vkrkr r", whisperAudio);
+          whisperAudio.load();
+          whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+          whisperAudioProgress.value = 0;
+          whisperAudioTime.textContent = "00:00 / 00:00";
+          // Hide or reset existing audio UI
+          resetWhisperTtsUI();
+
+          const text = $("#whisper-transcription-editable").val().trim();
+          if (!text) return;
+          const speaker = $("#whisperTtsSpeakerSelect").val();
+          const speed = $("#whisperTtsSpeedRange").val();
+
+          $.post(
+            "/api/tts",
+            { text: text, speaker: speaker, speed: speed },
+            function (data) {
+              if (data.audio) {
+                whisperAudioControls.style.display = "flex";
+                whisperAudio.classList.remove("hidden");
+                whisperAudio.src = "data:audio/wav;base64," + data.audio;
+                whisperAudio.load();
+                whisperPlayPauseBtn.innerHTML =
+                  '<i class="bi bi-play-fill"></i>';
+                whisperAudioProgress.value = 0;
+                whisperAudioTime.textContent = "00:00 / 00:00";
+              }
+            }
+          ).fail(function (xhr) {
+            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          });
+        });
+
+        function resetWhisperTtsUI() {
+          whisperAudio.pause();
+          whisperAudio.src = "";
+          whisperAudioTime.textContent = "00:00 / 00:00";
+          whisperAudioProgress.value = 0;
+          whisperAudioControls.style.display = "none";
+          whisperAudio.classList.add("hidden");
+        }
+
+        whisperPlayPauseBtn.addEventListener("click", function () {
+          if (whisperAudio.paused || whisperAudio.currentTime <= 0) {
+            whisperAudio.play();
+            whisperPlayPauseBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
+          } else {
+            whisperAudio.pause();
+            whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+          }
+        });
+
+        whisperAudio.addEventListener("timeupdate", function () {
+          if (whisperAudio.duration > 0) {
+            const percent =
+              (whisperAudio.currentTime / whisperAudio.duration) * 100;
+            whisperAudioProgress.value = percent;
+          }
+          const cur = formatTime(whisperAudio.currentTime);
+          const dur = formatTime(whisperAudio.duration);
+          whisperAudioTime.textContent = `${cur} / ${dur}`;
+        });
+
+        whisperAudioProgress.addEventListener("input", function () {
+          if (whisperAudio.duration) {
+            whisperAudio.currentTime =
+              (whisperAudioProgress.value / 100) * whisperAudio.duration;
+          }
+        });
+
+        whisperAudio.addEventListener("ended", function () {
+          whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+        });
+
+        // Utility to format time (seconds => mm:ss)
+        function formatTime(seconds) {
+          if (!seconds || isNaN(seconds)) {
+            return "00:00";
+          }
+          const m = Math.floor(seconds / 60);
+          const s = Math.floor(seconds % 60);
+          return `${m
+            .toString()
+            .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+        }
+
+        // TTS speed label updates
+        $("#whisperTtsSpeedRange").on("input", function () {
+          $("#whisperTtsSpeedValue").text($(this).val() + "x");
+        });
+        $("#modelTtsSpeedRange").on("input", function () {
+          $("#modelTtsSpeedValue").text($(this).val() + "x");
+        });
+
+        // Add Model
+        $("#add-model-form").on("submit", function (e) {
+          e.preventDefault();
+          $("#add-model-result").hide();
+          $("#usage-code").hide();
+          $.post("/api/add_model", $(this).serialize(), function (data) {
+            if (data.error) {
+              alert("Error: " + data.error);
+            } else {
+              $("#add-model-success").text(data.message);
+              $("#add-model-result").show();
+              $("#usage-code").text(data.usage_code).show();
+              loadModelsForDropdown("#model");
+              loadModelsForDropdown("#delete_model_name");
+              loadModelsForDropdown("#code_model_name");
+            }
+          }).fail(function (xhr) {
+            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          });
+        });
+
+        // Delete Model
+        $("#delete-model-form").on("submit", function (e) {
+          e.preventDefault();
+          $("#delete-model-result").hide();
+          $.post("/api/delete_model", $(this).serialize(), function (data) {
+            if (data.error) {
+              alert("Error: " + data.error);
+            } else {
+              $("#delete-model-success").text(data.message);
+              $("#delete-model-result").show();
+              loadModelsForDropdown("#model");
+              loadModelsForDropdown("#delete_model_name");
+              loadModelsForDropdown("#code_model_name");
+            }
+          }).fail(function (xhr) {
+            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          });
+        });
+
+        // Get Client Code
+        $("#get-code-form").on("submit", function (e) {
+          e.preventDefault();
+          $("#get-code-result").hide();
+          $.post("/api/get_client_code", $(this).serialize(), function (data) {
+            if (data.error) {
+              alert("Error: " + data.error);
+            } else {
+              $("#client-code-display").text(data.usage_code);
+              $("#get-code-result").show();
+            }
+          }).fail(function (xhr) {
+            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          });
+        });
+
+        // Server start, stop, logs
+        $("#start-server").click(function () {
+          $("#server-result").hide();
+          $("#server-logs-box").hide();
+          $.post("/api/start_server", {}, function (data) {
+            if (data.error) {
+              $("#server-message").text(data.error);
+              if (data.logs) {
+                $("#server-logs-box").text(data.logs).show();
+              }
+              $("#server-result").show();
+            } else {
+              $("#server-message").text(data.message);
+              $("#server-result").show();
+            }
+          }).fail(function (xhr) {
+            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          });
+        });
+
+        $("#stop-server").click(function () {
+          $("#server-result").hide();
+          $("#server-logs-box").hide();
+          $.post("/api/stop_server", {}, function (data) {
+            if (data.error) {
+              alert("Error: " + data.error);
+            } else {
+              $("#server-message").text(data.message);
+              $("#server-result").show();
+            }
+          }).fail(function (xhr) {
+            alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+          });
+        });
+
+        $("#logs-server").click(function () {
+          $("#server-result").hide();
+          $.get("/api/get_server_logs", function (data) {
+            if (data.logs) {
+              $("#server-logs-box").text(data.logs).show();
+            } else {
+              $("#server-logs-box").text("No logs available.").show();
+            }
+          }).fail(function (xhr) {
+            const errMsg =
+              xhr.responseJSON?.error ||
+              xhr.statusText ||
+              "Error retrieving logs";
+            $("#server-logs-box").text(errMsg).show();
+          });
         });
       });
-    });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
