@@ -65,19 +65,24 @@ def infer_model(model_name, input_text):
     return response.as_numpy("OUTPUT")
 
 
-def convert_webm_to_wav(webm_bytes) -> bytes:
+def convert_audio_to_wav(input_bytes: bytes, filename: str) -> bytes:
     """
-    Convert in-memory WebM bytes to WAV bytes, returning the WAV content.
+    Convert an audio file (webm or mp4, etc.) to WAV bytes (16kHz, mono).
+    The 'filename' hint is used to pick the temp suffix (e.g. .webm or .mp4).
     """
-    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_input:
-        temp_input.write(webm_bytes)
+    # Decide suffix based on filename
+    extension = os.path.splitext(filename)[1].lower()
+    if not extension:
+        extension = ".webm"  # default if somehow no extension provided
+    with tempfile.NamedTemporaryFile(suffix=extension, delete=False) as temp_input:
+        temp_input.write(input_bytes)
         temp_input.flush()
-        temp_webm_path = temp_input.name
+        temp_input_path = temp_input.name
 
-    temp_wav_path = temp_webm_path.replace(".webm", ".wav")
+    temp_wav_path = temp_input_path + ".wav"
     cmd = [
         "ffmpeg", "-y",
-        "-i", temp_webm_path,
+        "-i", temp_input_path,
         "-ar", "16000",
         "-ac", "1",
         temp_wav_path
@@ -87,8 +92,8 @@ def convert_webm_to_wav(webm_bytes) -> bytes:
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"FFmpeg conversion failed: {e}")
     finally:
-        if os.path.exists(temp_webm_path):
-            os.remove(temp_webm_path)
+        if os.path.exists(temp_input_path):
+            os.remove(temp_input_path)
 
     with open(temp_wav_path, "rb") as f:
         wav_bytes = f.read()
@@ -173,7 +178,7 @@ def query_model():
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
     """
-    Accepts 'audio_data' in WebM format, converts to WAV,
+    Accepts 'audio_data' in webm/mp4 format, converts to WAV,
     transcribes via Whisper, stores record in DB.
     Expects 'activity_id' in the form data.
     """
@@ -183,8 +188,9 @@ def transcribe_audio():
         return jsonify({'error': 'No audio file received.'}), 400
 
     try:
-        webm_bytes = file.read()
-        wav_bytes = convert_webm_to_wav(webm_bytes)
+        input_bytes = file.read()
+        filename = file.filename or "recording.webm"  # fallback
+        wav_bytes = convert_audio_to_wav(input_bytes, filename)
 
         # Store WAV in DB (GridFS)
         file_id = mongo_client.store_file(
@@ -223,7 +229,7 @@ def tts_endpoint():
     text = request.form.get('text', '')
     speaker = request.form.get('speaker', 'p229')
     speed_str = request.form.get('speed', '1.0')
-    activity_id = request.form.get('activity_id', '').strip()  # Updated
+    activity_id = request.form.get('activity_id', '').strip()
     if not text:
         return jsonify({'error': 'No text provided.'}), 400
 

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>LLM Playground (Single Page)</title>
 
     <!-- Bootstrap CSS -->
@@ -929,13 +929,29 @@
           resetModelTtsUI();
           resetWhisperTtsUI();
 
+          // Determine a mimeType that is supported
+          let mimeType = "";
+          const possibleTypes = [
+            "audio/webm; codecs=opus",
+            "audio/mp4",
+          ];
+          for (const t of possibleTypes) {
+            if (MediaRecorder.isTypeSupported(t)) {
+              mimeType = t;
+              break;
+            }
+          }
+          // If none found, let the browser pick
           try {
             const stream = await navigator.mediaDevices.getUserMedia({
-              audio: true,
+              audio: true
             });
-            mediaRecorder = new MediaRecorder(stream, {
-              mimeType: "audio/webm; codecs=opus",
-            });
+
+            if (mimeType) {
+              mediaRecorder = new MediaRecorder(stream, { mimeType });
+            } else {
+              mediaRecorder = new MediaRecorder(stream);
+            }
 
             mediaRecorder.onstart = function () {
               $("#recordingUI").removeClass("hidden");
@@ -980,11 +996,19 @@
             $("#recordingIndicator").hide();
             $("#recordingUI").addClass("hidden");
 
+            // We'll decide extension based on what we used
+            // If we used "audio/mp4" => name it "recording.mp4"
+            // else => default "recording.webm"
+            let extension = ".webm";
+            if (mediaRecorder.mimeType.indexOf("mp4") !== -1) {
+              extension = ".mp4";
+            }
+
             const blob = new Blob(audioChunks, {
-              type: "audio/webm; codecs=opus",
+              type: mediaRecorder.mimeType || "audio/webm"
             });
             const formData = new FormData();
-            formData.append("audio_data", blob, "recording.webm");
+            formData.append("audio_data", blob, "recording" + extension);
             formData.append("activity_id", currentActivityId);
 
             $.ajax({
@@ -1080,15 +1104,10 @@
         resetModelTtsUI();
         resetWhisperTtsUI();
 
-        // Possibly revert user query (#query) to match record.input_data
-        // or revert whisper text (#whisper-transcription-editable)
-        // Then show/hide relevant sections
         const type = record.interaction_type;
 
         if (type === "text-to-text") {
-          // The user prompt for text-to-text is record.input_data
           $("#query").val(record.input_data || "");
-          // The model's response is record.output_data
           $("#response").text(record.output_data || "");
           $("#response-container").show();
 
@@ -1105,7 +1124,6 @@
           $("#whisperInferenceSection").hide();
 
         } else if (type === "speech-to-text") {
-          // The transcribed text is record.output_data
           $("#whisper-transcription-editable").val(record.output_data || "");
           $("#whisper-container").show();
           $("#whisperAudioSection").show();
@@ -1116,8 +1134,7 @@
           $("#responseAudioSection").hide();
 
         } else if (type === "text-to-speech") {
-          // Usually we do not directly display text-to-speech records here
-          // but if needed, you can show them or do nothing
+          // Typically we do not directly display text-to-speech records here
           $("#response-container").hide();
           $("#responseAudioSection").hide();
           $("#whisper-container").hide();
@@ -1156,12 +1173,9 @@
           function (data) {
             $("#loader").hide();
             if (data.response) {
-              // show new response
               $("#response").text(data.response);
               $("#response-container").show();
               $("#responseAudioSection").show();
-
-              // fetch updated set of records, jump to last
               fetchActivityRecords(true);
             } else {
               $("#response").text("Error: " + data.error);
@@ -1187,13 +1201,7 @@
         recordInterval = setInterval(function () {
           const elapsedMs = Date.now() - recordStartTime;
           const totalSeconds = Math.floor(elapsedMs / 1000);
-          const minutes = Math.floor(totalSeconds / 60);
-          const seconds = totalSeconds % 60;
-          const timeStr =
-            String(minutes).padStart(2, "0") +
-            ":" +
-            String(seconds).padStart(2, "0");
-          $("#record-timer").text(timeStr);
+          $("#record-timer").text(formatTime(totalSeconds));
         }, 1000);
       }
       function stopRecordingTimer() {
@@ -1218,7 +1226,6 @@
 
         $("#playResponseTTSBtn").click(function () {
           resetModelTtsUI();
-
           const text = $("#response").text().trim();
           if (!text) return;
           const speaker = $("#modelTtsSpeakerSelect").val();
@@ -1288,7 +1295,6 @@
 
         $("#playWhisperTTSBtn").click(function () {
           resetWhisperTtsUI();
-
           const text = $("#whisper-transcription-editable").val().trim();
           if (!text) return;
           const speaker = $("#whisperTtsSpeakerSelect").val();
