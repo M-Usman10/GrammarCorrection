@@ -10,110 +10,108 @@ mongo_client = MongoDBClient()
 @app.route('/', methods=['GET'])
 def db_view():
     """
-    Displays a page where we can filter the 'records' in MongoDB
-    with pagination (50 per page).
-    We fit (Interaction Type, Model Name, Date From, Date To, Activity ID)
-    in the first row, and Raw Query (JSON) in the second row.
+    Show transactions from the 'transactions' collection using the new structure.
+    We'll pass them to 'db_view.html' with audio playback.
+    Filters: year, record_id, transaction_id, date_from, date_to, raw_query.
     """
     page_size = 50
     page = request.args.get('page', 1, type=int)
 
-    filter_interaction_type = request.args.get('filter_interaction_type', '').strip() or None
-    filter_model_name = request.args.get('filter_model_name', '').strip() or None
-    date_from_str = request.args.get('filter_date_from', '').strip()
-    date_to_str = request.args.get('filter_date_to', '').strip()
-    filter_activity_id = request.args.get('filter_activity_id', '').strip() or None
-    raw_query = request.args.get('raw_query', '').strip() or None
+    filter_year = request.args.get('filter_year','').strip() or None
+    filter_record_id = request.args.get('filter_record_id','').strip() or None
+    filter_transaction_id = request.args.get('filter_transaction_id','').strip() or None
+    date_from_str = request.args.get('filter_date_from','').strip()
+    date_to_str = request.args.get('filter_date_to','').strip()
+    raw_query = request.args.get('raw_query','').strip() or None
 
-    # Attempt to parse date_from / date_to
+    date_from_obj = None
+    date_to_obj = None
     try:
-        date_from_obj = datetime.datetime.fromisoformat(date_from_str) if date_from_str else None
-    except ValueError:
-        date_from_obj = None
-
+        if date_from_str:
+            date_from_obj = datetime.datetime.fromisoformat(date_from_str)
+    except:
+        pass
     try:
-        date_to_obj = datetime.datetime.fromisoformat(date_to_str) if date_to_str else None
-    except ValueError:
-        date_to_obj = None
+        if date_to_str:
+            date_to_obj = datetime.datetime.fromisoformat(date_to_str)
+    except:
+        pass
 
-    # If a raw query is supplied, we ignore the standard filters
     if raw_query:
         try:
-            records = mongo_client.run_raw_query(raw_query)
-            total_count = len(records)
-            records = records[(page - 1) * page_size : page * page_size]
-            total_pages = math.ceil(total_count / page_size) if total_count else 1
+            all_docs = mongo_client.run_raw_query_transactions(raw_query)
+            total_count = len(all_docs)
+            start_i = (page - 1) * page_size
+            end_i = start_i + page_size
+            docs = all_docs[start_i:end_i]
+            total_pages = math.ceil(total_count/page_size) if total_count else 1
         except ValueError as ve:
             return render_template(
-                'db_view.html',
+                "db_view.html",
                 error_msg=f"Raw query error: {ve}",
-                records=[],
-                filter_interaction_type=filter_interaction_type or "",
-                filter_model_name=filter_model_name or "",
+                transactions=[],
+                filter_year=filter_year or "",
+                filter_record_id=filter_record_id or "",
+                filter_transaction_id=filter_transaction_id or "",
                 filter_date_from=date_from_str,
                 filter_date_to=date_to_str,
-                filter_activity_id=filter_activity_id or "",
-                raw_query=raw_query,
+                raw_query=raw_query or "",
                 current_page=page,
                 total_pages=1
             )
     else:
-        # If filter_activity_id is given, handle that
-        if filter_activity_id:
-            all_records = mongo_client.get_records_by_activity_id(filter_activity_id)
-            total_count = len(all_records)
-            start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
-            records = all_records[start_idx:end_idx]
-            total_pages = math.ceil(total_count / page_size) if total_count else 1
-        else:
-            # Normal path: use other filters with pagination
-            records = mongo_client.get_records_paginated(
-                interaction_type=filter_interaction_type,
-                model_name=filter_model_name,
-                start_date=date_from_obj,
-                end_date=date_to_obj,
-                page=page,
-                page_size=page_size
-            )
-            total_count = mongo_client.count_records(
-                interaction_type=filter_interaction_type,
-                model_name=filter_model_name,
-                start_date=date_from_obj,
-                end_date=date_to_obj
-            )
-            total_pages = math.ceil(total_count / page_size) if total_count else 1
+        docs = mongo_client.get_transactions_paginated(
+            year_val=filter_year,
+            record_id=filter_record_id,
+            transaction_id=filter_transaction_id,
+            start_date=date_from_obj,
+            end_date=date_to_obj,
+            page=page,
+            page_size=page_size
+        )
+        total_count = mongo_client.count_transactions(
+            year_val=filter_year,
+            record_id=filter_record_id,
+            transaction_id=filter_transaction_id,
+            start_date=date_from_obj,
+            end_date=date_to_obj
+        )
+        total_pages = math.ceil(total_count / page_size) if total_count else 1
 
-    processed_records = []
-    for r in records:
-        rec_copy = dict(r)
-        rec_copy["_id"] = str(r["_id"])
-
-        audio_file_id = None
-        if "file_id=" in rec_copy.get("input_data", ""):
-            audio_file_id = rec_copy["input_data"].split("file_id=")[-1].strip()
-        elif "file_id=" in rec_copy.get("output_data", ""):
-            audio_file_id = rec_copy["output_data"].split("file_id=")[-1].strip()
-
-        if audio_file_id:
-            try:
-                audio_bytes = mongo_client.get_file(audio_file_id)
-                b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
-                rec_copy["audio_base64"] = b64_audio
-                rec_copy["audio_file_id"] = audio_file_id
-            except ValueError as e:
-                rec_copy["audio_error"] = str(e)
-
-        processed_records.append(rec_copy)
+    # We may want to embed audio_base64 for each chat message that has an audio_file_id
+    processed = []
+    for d in docs:
+        dcopy = dict(d)
+        dcopy["_id"] = str(d["_id"])
+        # Let's walk "umisource -> user -> year -> record -> unique -> chat_history"
+        # and embed audio for any "audio_file_id"
+        umisource_obj = dcopy.get("umisource", {})
+        # we do a double/triple loop or a small recursive approach
+        # For brevity, let's do a manual approach:
+        for user_k, user_dict in umisource_obj.items():
+            for year_k, year_dict in user_dict.items():
+                for rec_k, rec_dict in year_dict.items():
+                    for uk, tdict in rec_dict.items():
+                        chat_hist = tdict.get("chat_history", [])
+                        for msg in chat_hist:
+                            audio_id = msg.get("audio_file_id")
+                            if audio_id:
+                                try:
+                                    audio_bytes = mongo_client.get_file(audio_id)
+                                    b64 = base64.b64encode(audio_bytes).decode("utf-8")
+                                    msg["audio_base64"] = b64
+                                except ValueError as e:
+                                    msg["audio_error"] = str(e)
+        processed.append(dcopy)
 
     return render_template(
-        'db_view.html',
-        records=processed_records,
-        filter_interaction_type=filter_interaction_type or "",
-        filter_model_name=filter_model_name or "",
+        "db_view.html",
+        transactions=processed,
+        filter_year=filter_year or "",
+        filter_record_id=filter_record_id or "",
+        filter_transaction_id=filter_transaction_id or "",
         filter_date_from=date_from_str,
         filter_date_to=date_to_str,
-        filter_activity_id=filter_activity_id or "",
         raw_query=raw_query or "",
         error_msg=None,
         current_page=page,

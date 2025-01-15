@@ -2,16 +2,15 @@ import os
 import io
 import tempfile
 import subprocess
+import re
+import datetime
 import base64
-import numpy as np
-import librosa
-import random
-import string
 from flask import Flask, render_template, request, jsonify
+import numpy as np
 from tritonclient.http import InferenceServerClient, InferInput
 from TTS.api import TTS
+from bson import ObjectId
 
-# Import our new utils modules
 from utils.triton_server_utils import (
     start_triton_server, stop_triton_server, get_triton_logs
 )
@@ -22,58 +21,78 @@ from utils.model_utils import (
 from utils.database_utils import MongoDBClient
 
 app = Flask(__name__)
-
 TRITON_SERVER_URL = "localhost:8000"
 
-# Start Ollama server if not running (same logic as before)
+# Start Ollama server if not running
 if not subprocess.run(["pgrep", "-f", "ollama serve"], stdout=subprocess.DEVNULL).returncode == 0:
     subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-# Create a global MongoDB client
 mongo_client = MongoDBClient()
 
+# Hardcode for now
+USERNAME = "samuel"
 
-def generate_activity_id(length=8):
-    """Generate a random alpha-numeric activity ID (max 8 characters)."""
-    chars = string.ascii_letters + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
-
-
-def get_next_step_index(activity_id):
+# -----------------------------------------------------
+# ID Generators
+# -----------------------------------------------------
+def generate_record_id():
     """
-    Find the highest step_index in the DB for this activity_id
-    and return step_index + 1. If none found, return 0.
+    Format: yyddmmhHH
+    E.g. 251205h09
     """
-    records = mongo_client.get_records_by_activity_id(activity_id)
-    if not records:
-        return 0
-    max_step = max(r.get("step_index", 0) for r in records)
-    return max_step + 1
+    now_utc = datetime.datetime.utcnow()
+    return now_utc.strftime("%y%m%d") + "h" + now_utc.strftime("%H")
 
+def generate_transaction_id():
+    """
+    Format: yymmdd_hhmmss + 'usrc'
+    E.g. 251205_093012usrc
+    """
+    now_utc = datetime.datetime.utcnow()
+    base_str = now_utc.strftime("%y%m%d_%H%M%S")
+    return base_str + "usrc"
 
-def infer_model(model_name, input_text):
+# -----------------------------------------------------
+# TTS text sanitizer (remove triple backticks)
+# -----------------------------------------------------
+def sanitize_tts_text(text: str) -> str:
+    """
+    Remove triple backticks plus some other symbols,
+    but keep single backticks if needed.
+    """
+    text = re.sub(r"```+", "", text)
+    pattern = r"[#\*\_>~\-\+\=\|\{\}\[\]\(\)]"
+    return re.sub(pattern, "", text)
+
+# -----------------------------------------------------
+# TRITON inference
+# -----------------------------------------------------
+def infer_model(model_name, chat_history_or_text):
+    grammar_models = [
+        "happytransformer",
+        "grammarly-coedit-large",
+        "deep-learning-analytics-Grammar-Correction-T5"
+    ]
     client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=1000)
-    # Example special-casing for T5
-    if model_name == "deep-learning-analytics-Grammar-Correction-T5":
-        inputs = [InferInput("DUMMY_INPUT", [1, 1, 1], "BYTES")]
-        inputs[0].set_data_from_numpy(np.array([[[input_text]]], dtype=object))
-    else:
+    if model_name in grammar_models:
         inputs = [InferInput("INPUT", [1, 1], "BYTES")]
-        inputs[0].set_data_from_numpy(np.array([[input_text]], dtype=object))
+        inputs[0].set_data_from_numpy(np.array([[chat_history_or_text]], dtype=object))
+    else:
+        import json
+        as_json = json.dumps(chat_history_or_text)
+        inputs = [InferInput("INPUT", [1, 1], "BYTES")]
+        inputs[0].set_data_from_numpy(np.array([[as_json]], dtype=object))
 
     response = client.infer(model_name, inputs)
     return response.as_numpy("OUTPUT")
 
-
+# -----------------------------------------------------
+# Audio conversion
+# -----------------------------------------------------
 def convert_audio_to_wav(input_bytes: bytes, filename: str) -> bytes:
-    """
-    Convert an audio file (webm or mp4, etc.) to WAV bytes (16kHz, mono).
-    The 'filename' hint is used to pick the temp suffix (e.g. .webm or .mp4).
-    """
-    # Decide suffix based on filename
     extension = os.path.splitext(filename)[1].lower()
     if not extension:
-        extension = ".webm"  # default if somehow no extension provided
+        extension = ".webm"
     with tempfile.NamedTemporaryFile(suffix=extension, delete=False) as temp_input:
         temp_input.write(input_bytes)
         temp_input.flush()
@@ -100,16 +119,13 @@ def convert_audio_to_wav(input_bytes: bytes, filename: str) -> bytes:
     os.remove(temp_wav_path)
     return wav_bytes
 
-
 def transcribe_whisper(wav_bytes: bytes):
-    """
-    Send WAV bytes to the 'whisper' model on Triton to get transcription text.
-    """
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp.write(wav_bytes)
         tmp.flush()
         temp_path = tmp.name
 
+    import librosa
     audio_data, _ = librosa.load(temp_path, sr=16000, mono=True)
     audio_data = audio_data.astype(np.float32)
     os.remove(temp_path)
@@ -119,305 +135,452 @@ def transcribe_whisper(wav_bytes: bytes):
     inputs[0].set_data_from_numpy(audio_data)
 
     response = client.infer("whisper", inputs)
-    transcription = response.as_numpy("OUTPUT")
-    if transcription is not None and transcription.size > 0:
-        return transcription[0].decode("utf-8")
+    result = response.as_numpy("OUTPUT")
+    if result is not None and result.size > 0:
+        return result[0].decode("utf-8")
     return ""
 
+# -----------------------------------------------------
+# ROUTES
+# -----------------------------------------------------
 
 @app.route('/')
 def index():
-    return render_template('Google-Like.html')
+    return render_template('umisource.html')
 
 
-@app.route('/api/new_activity', methods=['GET'])
-def new_activity():
-    """Generate and return a new activity ID."""
-    activity_id = generate_activity_id()
-    return jsonify({"activity_id": activity_id})
-
-
-@app.route('/api/list_models', methods=['GET'])
-def api_list_models():
-    models = list_models("./models")
-    return jsonify({'models': models})
-
-
-@app.route('/api/query', methods=['POST'])
-def query_model():
+@app.route('/api/new_transaction', methods=['POST'])
+def new_transaction():
     """
-    Model inference for user-provided text.
-    We also store the successful interaction in DB if no error.
-    Expects 'activity_id' in the form.
+    New structure:
+    {
+      "umisource": {
+        "<username>": {
+          "<yy>": {
+            "<yyddmmhHH>": {
+              "<unique_id_for_transaction>": {
+                "transaction id": "<yymmdd_hhmmssusrc>",
+                "chat_history": [],
+                "status": "open",
+                "created_at": ...
+              }
+            }
+          }
+        }
+      }
+    }
     """
-    model_name = request.form.get('model', '').strip()
-    input_text = request.form.get('query', '')
-    activity_id = request.form.get('activity_id', '').strip()
+    now_utc = datetime.datetime.utcnow()
+    yy = now_utc.strftime("%y")
+    rec_id = generate_record_id()
+    trans_id = generate_transaction_id()
+
+    inserted_id = mongo_client.create_new_transaction(USERNAME, yy, rec_id, trans_id)
+    return jsonify({
+        "year": yy,
+        "record_id": rec_id,
+        "transaction_id": trans_id,
+        "_id": str(inserted_id)
+    })
+
+@app.route('/api/cancel_transaction', methods=['POST'])
+def cancel_transaction():
+    doc_id = request.form.get('_id', '').strip()
+    if not doc_id:
+        return jsonify({"error": "No _id provided"}), 400
+    doc = mongo_client.get_transaction_by_oid(doc_id)
+    if not doc:
+        return jsonify({"error": "Doc not found"}),404
+
+    # find the single unique transaction
+    # doc["umisource"][USERNAME][yy][rec_id] => dict of { uniqueKey: { } }
+    # We'll find the 1 uniqueKey
+    # If no chat_history => delete doc; else set status=canceled
     try:
-        output = infer_model(model_name, input_text)
-        decoded = output[0].decode('utf-8') if output.size > 0 else ""
+        um_data = doc["umisource"][USERNAME]
+        # might be multiple years, but assume only 1
+        for year_key in um_data.keys():
+            rec_dict = um_data[year_key]
+            for rec_key in rec_dict.keys():
+                unique_map = rec_dict[rec_key]
+                for unique_key in unique_map:
+                    tdict = unique_map[unique_key]
+                    # check chat_history
+                    ch = tdict.get("chat_history", [])
+                    if len(ch)==0:
+                        mongo_client.delete_transaction_by_oid(doc_id)
+                        return jsonify({"status":"deleted"})
+                    else:
+                        # set status => canceled
+                        mongo_client.update_transaction_status(doc_id, USERNAME, year_key, rec_key, unique_key, "canceled")
+                        return jsonify({"status":"canceled"})
+    except:
+        # if structure is not as expected => delete
+        mongo_client.delete_transaction_by_oid(doc_id)
+        return jsonify({"status":"deleted"})
 
-        # Determine step_index for this new record
-        step_index = get_next_step_index(activity_id)
+    return jsonify({"status":"error","msg":"No transaction found in doc"})
 
-        mongo_client.store_interaction(
-            interaction_type="text-to-text",
-            input_data=input_text,
-            output_data=decoded,
-            model_name=model_name,
-            metadata={"info": "query endpoint"},
-            activity_id=activity_id,
-            step_index=step_index
-        )
+@app.route('/api/find_transactions_by_tid', methods=['GET'])
+def find_transactions_by_tid():
+    t_id = request.args.get('transaction_id','').strip()
+    if not t_id:
+        return jsonify({"error":"No transaction_id provided"}),400
 
-        return jsonify({'response': decoded})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
+    docs = mongo_client.find_transactions_by_tid(t_id)
+    out=[]
+    for d in docs:
+        # We'll parse doc => find the exact transaction
+        try:
+            um_data = d["umisource"][USERNAME]
+            for year_key in um_data:
+                rec_dict = um_data[year_key]
+                for rec_key in rec_dict:
+                    unique_map = rec_dict[rec_key]
+                    for unique_id, tdict in unique_map.items():
+                        if tdict.get("transaction id")== t_id:
+                            created_at = tdict.get("created_at")
+                            if hasattr(created_at, "isoformat"):
+                                created_at = created_at.isoformat()
+                            out.append({
+                                "_id": str(d["_id"]),
+                                "transaction_id": t_id,
+                                "record_id": rec_key,
+                                "year": year_key,
+                                "created_at": created_at
+                            })
+        except:
+            pass
+    return jsonify({"results": out})
 
+@app.route('/api/load_transaction', methods=['GET'])
+def load_transaction():
+    doc_id = request.args.get('_id','').strip()
+    if not doc_id:
+        return jsonify({"error":"No _id provided"}),400
+    doc = mongo_client.get_transaction_by_oid(doc_id)
+    if not doc:
+        return jsonify({"error":"Transaction not found"}),404
+
+    # find the 1 transaction
+    # We flatten => doc["transaction_id"], doc["chat_history"]
+    # if multiple, just pick first
+    try:
+        um_data = doc["umisource"][USERNAME]
+        for year_key in um_data:
+            rec_dict = um_data[year_key]
+            for rec_key in rec_dict:
+                unique_map = rec_dict[rec_key]
+                for unique_id, tdict in unique_map.items():
+                    chat_hist = tdict.get("chat_history", [])
+                    doc["transaction_id"] = tdict["transaction id"]
+                    doc["chat_history"] = chat_hist
+                    doc["_id"] = str(doc["_id"])
+                    return jsonify(doc)
+    except:
+        pass
+
+    doc["_id"] = str(doc["_id"])
+    doc["transaction_id"]=""
+    doc["chat_history"]=[]
+    return jsonify(doc)
+
+@app.route('/api/get_chat_history', methods=['GET'])
+def get_chat_history():
+    doc_id = request.args.get('_id','').strip()
+    if not doc_id:
+        return jsonify({"error":"No _id provided"}),400
+    doc = mongo_client.get_transaction_by_oid(doc_id)
+    if not doc:
+        return jsonify({"error":"Transaction not found"}),404
+
+    try:
+        um_data = doc["umisource"][USERNAME]
+        for yk in um_data:
+            rec_dict = um_data[yk]
+            for rk in rec_dict:
+                unique_map = rec_dict[rk]
+                for uk, tdict in unique_map.items():
+                    t_id = tdict.get("transaction id","")
+                    ch = tdict.get("chat_history",[])
+                    return jsonify({"chat_history":ch,"transaction_id": t_id})
+    except:
+        pass
+
+    return jsonify({"chat_history":[],"transaction_id":""})
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
-    """
-    Accepts 'audio_data' in webm/mp4 format, converts to WAV,
-    transcribes via Whisper, stores record in DB.
-    Expects 'activity_id' in the form data.
-    """
     file = request.files.get('audio_data')
-    activity_id = request.form.get('activity_id', '').strip()
-    if not file:
-        return jsonify({'error': 'No audio file received.'}), 400
-
+    doc_id = request.form.get('_id','').strip()
+    if not file or not doc_id:
+        return jsonify({"error":"Missing file or _id"}),400
     try:
         input_bytes = file.read()
-        filename = file.filename or "recording.webm"  # fallback
+        filename = file.filename or "recording.webm"
         wav_bytes = convert_audio_to_wav(input_bytes, filename)
-
-        # Store WAV in DB (GridFS)
         file_id = mongo_client.store_file(
             file_bytes=wav_bytes,
             filename="recording.wav",
             content_type="audio/wav",
-            metadata={"purpose": "speech-to-text"}
+            metadata={"purpose":"speech-to-text"}
         )
-
-        # Transcribe
-        transcription_text = transcribe_whisper(wav_bytes)
-
-        # Determine step_index for this new record
-        step_index = get_next_step_index(activity_id)
-
-        mongo_client.store_interaction(
-            interaction_type="speech-to-text",
-            input_data=f"(WAV file in DB) file_id={file_id}",
-            output_data=transcription_text,
-            model_name="whisper",
-            activity_id=activity_id,
-            step_index=step_index
-        )
-
-        return jsonify({'transcription': transcription_text})
+        text_out = transcribe_whisper(wav_bytes)
+        # append user stt
+        mongo_client.append_chat_message_stt(doc_id, text_out, file_id, USERNAME)
+        return jsonify({'transcription': text_out})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error":str(e)}),500
 
+@app.route('/api/query', methods=['POST'])
+def query_model():
+    model_name = request.form.get('model','').strip()
+    user_prompt = request.form.get('query','')
+    doc_id = request.form.get('_id','').strip()
+    system_prompt = request.form.get('system_prompt','').strip()
+
+    if not doc_id:
+        return jsonify({"error":"No _id provided."}),400
+    if not model_name:
+        return jsonify({"error":"No model name provided."}),400
+
+    doc = mongo_client.get_transaction_by_oid(doc_id)
+    if not doc:
+        return jsonify({"error":f"No doc found by _id={doc_id}"}),404
+
+    # extract the single transaction
+    # append system if needed
+    # append user
+    # build conversation => skip TTS or STT
+    try:
+        um_data = doc["umisource"][USERNAME]
+        for yk in um_data:
+            rec_dict = um_data[yk]
+            for rk in rec_dict:
+                unique_map = rec_dict[rk]
+                for uk, tdict in unique_map.items():
+                    ch = tdict.get("chat_history",[])
+                    # system
+                    last_sys = None
+                    for msg in reversed(ch):
+                        if msg.get("role")=="system":
+                            last_sys = msg["content"]
+                            break
+                    if system_prompt and system_prompt!=last_sys:
+                        ch.append({
+                            "role":"system",
+                            "content":system_prompt,
+                            "interaction_type":"system",
+                            "timestamp": datetime.datetime.utcnow()
+                        })
+                    if user_prompt.strip():
+                        ch.append({
+                            "role":"user",
+                            "content": user_prompt,
+                            "interaction_type":"text-to-text",
+                            "timestamp": datetime.datetime.utcnow()
+                        })
+                    else:
+                        return jsonify({"error":"No user prompt provided."}),400
+
+                    # build final conversation
+                    grammar = ["happytransformer","grammarly-coedit-large","deep-learning-analytics-Grammar-Correction-T5"]
+                    if model_name in grammar:
+                        to_infer = user_prompt
+                    else:
+                        conv = []
+                        for msg in ch:
+                            itype = msg.get("interaction_type","")
+                            if itype in ["speech-to-text","text-to-speech"]:
+                                continue
+                            r = msg["role"]
+                            if r.startswith("openai") or r.startswith("ollama") or r.startswith("gpt") or r in grammar:
+                                conv.append({"role":"assistant","content":msg["content"]})
+                            elif r=="system":
+                                conv.append({"role":"system","content":msg["content"]})
+                            elif r=="user":
+                                conv.append({"role":"user","content":msg["content"]})
+                            else:
+                                conv.append({"role":r,"content":msg["content"]})
+                        to_infer = conv
+
+                    raw_out = infer_model(model_name, to_infer)
+                    decoded = raw_out[0].decode('utf-8') if raw_out.size>0 else ""
+                    ch.append({
+                        "role": model_name,
+                        "content": decoded,
+                        "interaction_type":"text-to-text",
+                        "timestamp": datetime.datetime.utcnow()
+                    })
+                    tdict["chat_history"] = ch
+                    # if there's at least 1 => closed
+                    tdict["status"]="closed"
+
+                    # update
+                    mongo_client.update_transaction_subdict(doc_id, USERNAME, yk, rk, uk, tdict)
+                    return jsonify({"response": decoded})
+    except Exception as e:
+        return jsonify({"error":str(e)}),400
+
+    return jsonify({"error":"No transaction found in doc structure"}),404
 
 @app.route('/api/tts', methods=['POST'])
 def tts_endpoint():
-    """
-    Convert text to speech using TTS, store the result in DB if desired,
-    now also using activity_id if provided.
-    """
-    text = request.form.get('text', '')
-    speaker = request.form.get('speaker', 'p229')
-    speed_str = request.form.get('speed', '1.0')
-    activity_id = request.form.get('activity_id', '').strip()
+    text = request.form.get('text','')
+    speaker = request.form.get('speaker','p229')
+    speed_str = request.form.get('speed','1.0')
+    doc_id = request.form.get('_id','').strip()
     if not text:
-        return jsonify({'error': 'No text provided.'}), 400
+        return jsonify({'error':'No text provided.'}),400
 
+    clean_text = sanitize_tts_text(text)
     try:
         speed = float(speed_str)
-        if speed < 0.5:
-            speed = 0.5
-        if speed > 2.0:
-            speed = 2.0
+        speed = max(0.5, min(speed,2.0))
 
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
             tmp_path = tmp.name
 
         local_tts = TTS(model_name="tts_models/en/vctk/vits")
-        local_tts.tts_to_file(text=text, file_path=tmp_path, speaker=speaker)
+        local_tts.tts_to_file(text=clean_text, file_path=tmp_path, speaker=speaker)
 
-        # Adjust speed if needed
-        if abs(speed - 1.0) > 1e-5:
-            tmp_output_path = tmp_path + '.speed.wav'
-            cmd = [
-                "ffmpeg", "-y",
-                "-i", tmp_path,
-                "-filter:a", f"atempo={speed}",
-                tmp_output_path
-            ]
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            with open(tmp_output_path, 'rb') as f:
+        if abs(speed-1.0)>1e-5:
+            tmp2 = tmp_path+".speed.wav"
+            cmd=["ffmpeg","-y","-i",tmp_path,"-filter:a",f"atempo={speed}", tmp2]
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            with open(tmp2,'rb') as f:
                 raw_audio = f.read()
-            os.remove(tmp_output_path)
+            os.remove(tmp2)
             os.remove(tmp_path)
         else:
-            with open(tmp_path, 'rb') as f:
+            with open(tmp_path,'rb') as f:
                 raw_audio = f.read()
             os.remove(tmp_path)
 
-        # Optionally store the TTS result in DB
         file_id = mongo_client.store_file(
             file_bytes=raw_audio,
             filename="tts_output.wav",
             content_type="audio/wav",
-            metadata={"purpose": "text-to-speech", "speaker": speaker, "speed": speed}
-        )
-        # Also store text record, attaching the same activity_id
-        step_index = get_next_step_index(activity_id)
-        mongo_client.store_interaction(
-            interaction_type="text-to-speech",
-            input_data=text,
-            output_data=f"(TTS audio file in DB) file_id={file_id}",
-            model_name="vits_tts",
-            activity_id=activity_id,
-            step_index=step_index
+            metadata={"purpose":"text-to-speech","speaker":speaker,"speed":speed}
         )
 
-        base64_audio = base64.b64encode(raw_audio).decode('utf-8')
-        return jsonify({'audio': base64_audio})
+        if doc_id:
+            doc = mongo_client.get_transaction_by_oid(doc_id)
+            if doc:
+                # find the single transaction
+                try:
+                    um_data = doc["umisource"][USERNAME]
+                    for yk in um_data:
+                        rec_dict = um_data[yk]
+                        for rk in rec_dict:
+                            unique_map = rec_dict[rk]
+                            for uk, tdict in unique_map.items():
+                                ch = tdict.get("chat_history",[])
+                                ch.append({
+                                    "role":"tts_engine",
+                                    "content":text,
+                                    "interaction_type":"text-to-speech",
+                                    "audio_file_id":file_id,
+                                    "timestamp":datetime.datetime.utcnow()
+                                })
+                                tdict["chat_history"]=ch
+                                mongo_client.update_transaction_subdict(doc_id, USERNAME, yk, rk, uk, tdict)
+                                break
+                except:
+                    pass
+
+        return jsonify({'audio': base64.b64encode(raw_audio).decode('utf-8')})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error":str(e)}),500
 
+# Model management
+@app.route('/api/list_models', methods=['GET'])
+def api_list_models():
+    mods = list_models("./models")
+    return jsonify({'models':mods})
 
-# Add & Delete model
 @app.route('/api/add_model', methods=['POST'])
 def api_add_model():
-    new_model_name = request.form.get('new_model_name', '').strip()
-    if not new_model_name:
-        return jsonify({'error': "Model name cannot be empty."}), 400
+    nm= request.form.get('new_model_name','').strip()
+    if not nm: return jsonify({'error':"Model name cannot be empty."}),400
     try:
-        create_model(new_model_name, "./models")
-        safe_name = sanitize_model_name(new_model_name)
-        usage_code = f"""import numpy as np
+        create_model(nm, "./models")
+        sn = sanitize_model_name(nm)
+        usage_code=f"""import numpy as np
 from tritonclient.http import InferenceServerClient, InferInput
 
-TRITON_SERVER_URL = "localhost:8000"
-client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=1000)
-
-# Prepare input for model
-user_command = "Hi, my name is Samuel"
-inputs_model = [InferInput("INPUT", [1, 1], "BYTES")]
-inputs_model[0].set_data_from_numpy(np.array([[user_command]], dtype=object))
-
-response_model = client.infer("{safe_name}", inputs_model)
-model_result = response_model.as_numpy("OUTPUT")
-
+TRITON_SERVER_URL="localhost:8000"
+client=InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=1000)
+user_command="Hi, my name is Samuel"
+inp=[InferInput("INPUT",[1,1],"BYTES")]
+inp[0].set_data_from_numpy(np.array([[user_command]],dtype=object))
+rsp=client.infer("{sn}", inp)
+model_result=rsp.as_numpy("OUTPUT")
 print("Model Response:", model_result)
 """
         return jsonify({
-            'status': 'success',
-            'message': f"Model '{new_model_name}' created successfully (folder: {safe_name}).",
+            'status':"success",
+            'message':f"Model '{nm}' created successfully (folder:{sn}).",
             'usage_code': usage_code
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
+        return jsonify({'error':str(e)}),500
 
 @app.route('/api/delete_model', methods=['POST'])
 def api_delete_model():
-    model_folder_name = request.form.get('delete_model_name', '').strip()
-    if not model_folder_name:
-        return jsonify({'error': "Model name cannot be empty."}), 400
+    mfn= request.form.get('delete_model_name','').strip()
+    if not mfn: return jsonify({'error':"Model name cannot be empty."}),400
     try:
-        delete_model(model_folder_name, "./models")
-        return jsonify({'status': 'success', 'message': f"Model '{model_folder_name}' deleted successfully."})
+        delete_model(mfn,"./models")
+        return jsonify({'status':"success",'message':f"Model '{mfn}' deleted successfully."})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
+        return jsonify({'error':str(e)}),500
 
 @app.route('/api/get_client_code', methods=['POST'])
 def api_get_client_code():
-    folder_name = request.form.get('folder_name', '').strip()
-    if not folder_name:
-        return jsonify({'error': "Folder name cannot be empty."}), 400
-    usage_code = f"""import numpy as np
+    fn= request.form.get('folder_name','').strip()
+    if not fn: return jsonify({'error':"Folder name cannot be empty."}),400
+    usage_code=f"""import numpy as np
 from tritonclient.http import InferenceServerClient, InferInput
 
-TRITON_SERVER_URL = "localhost:8000"
-client = InferenceServerClient(url=TRITON_SERVER_URL, network_timeout=1000)
-
-# Prepare input for model
-user_command = "Hi, my name is Samuel"
-inputs_model = [InferInput("INPUT", [1, 1], "BYTES")]
-inputs_model[0].set_data_from_numpy(np.array([[user_command]], dtype=object))
-
-response_model = client.infer("{folder_name}", inputs_model)
-model_result = response_model.as_numpy("OUTPUT")
-
+TRITON_SERVER_URL="localhost:8000"
+client=InferenceServerClient(url=TRITON_SERVER_URL,network_timeout=1000)
+user_command="Hi, my name is Samuel"
+inp=[InferInput("INPUT",[1,1],"BYTES")]
+inp[0].set_data_from_numpy(np.array([[user_command]],dtype=object))
+rsp=client.infer("{fn}", inp)
+model_result=rsp.as_numpy("OUTPUT")
 print("Model Response:", model_result)
 """
-    return jsonify({
-        'status': 'success',
-        'usage_code': usage_code
-    })
+    return jsonify({'status':"success",'usage_code':usage_code})
 
-
-# Get server logs
+# server logs
 @app.route('/api/get_server_logs', methods=['GET'])
 def api_get_server_logs():
-    logs = get_triton_logs()
-    return jsonify({'logs': logs})
+    logs=get_triton_logs()
+    return jsonify({'logs':logs})
 
-
-# Start/Stop Triton server
 @app.route('/api/start_server', methods=['POST'])
 def api_start_server():
-    success, msg, logs = start_triton_server()
-    if success:
-        return jsonify({'status': 'success', 'message': msg})
-    return jsonify({'error': msg, 'logs': logs}), 500
-
+    suc,msg,lg = start_triton_server()
+    if suc:
+        return jsonify({'status':"success",'message':msg})
+    return jsonify({'error':msg,'logs':lg}),500
 
 @app.route('/api/stop_server', methods=['POST'])
 def api_stop_server():
-    success, msg = stop_triton_server()
-    if success:
-        return jsonify({'status': 'success', 'message': msg})
-    return jsonify({'error': msg}), 500
+    s,m= stop_triton_server()
+    if s: return jsonify({'status':"success",'message':m})
+    return jsonify({'error':m}),500
 
-
-# Example to get a file from DB if needed
-@app.route('/api/get_file/<file_id>', methods=['GET'])
+@app.route('/api/get_file/<file_id>',methods=['GET'])
 def api_get_file(file_id):
-    """
-    Retrieve a file from GridFS by file_id and return as raw bytes or base64.
-    """
     try:
-        file_bytes = mongo_client.get_file(file_id)
-        b64 = base64.b64encode(file_bytes).decode("utf-8")
-        return jsonify({"base64_data": b64})
+        fb= mongo_client.get_file(file_id)
+        b64= base64.b64encode(fb).decode('utf-8')
+        return jsonify({"base64_data":b64})
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error":str(e)}),400
 
-
-@app.route('/api/get_activity', methods=['GET'])
-def api_get_activity():
-    """
-    Return all interactions for a given activity_id, sorted by step_index ascending.
-    """
-    activity_id = request.args.get('activity_id', '').strip()
-    if not activity_id:
-        return jsonify({'error': 'No activity_id provided.'}), 400
-
-    records = mongo_client.get_records_by_activity_id(activity_id)
-    # Sort by step_index ascending
-    sorted_records = sorted(records, key=lambda r: r.get("step_index", 0))
-    out = []
-    for r in sorted_records:
-        r['_id'] = str(r['_id'])
-        out.append(r)
-    return jsonify({'records': out})
-
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__=="__main__":
+    app.run(host="0.0.0.0",port=5000,debug=True)

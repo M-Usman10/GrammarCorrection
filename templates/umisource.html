@@ -3,18 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>LLM Playground (Single Page)</title>
+    <title>Umisource (Single Page)</title>
 
     <!-- Bootstrap CSS -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
-    <!-- Bootstrap Icons (for mic, check, x, and volume icons) -->
+    <!-- Bootstrap Icons (for mic, check, x, volume icons, etc.) -->
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
     />
+    <!-- Marked.js (for rendering Markdown) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
 
     <style>
       body {
@@ -107,24 +109,6 @@
         outline: none;
         cursor: pointer;
       }
-      .form-range::-webkit-slider-runnable-track {
-        background: black;
-        height: 8px;
-        border-radius: 4px;
-      }
-      .form-range::-webkit-range-progress {
-        background: gray;
-        height: 8px;
-        border-radius: 4px;
-      }
-      .form-range::-webkit-slider-thumb {
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        background: gray;
-        border-radius: 50%;
-        cursor: pointer;
-      }
       .audio-controls span {
         white-space: nowrap;
         font-size: 0.9rem;
@@ -134,6 +118,30 @@
       .whisperAudio {
         margin-top: 15px;
         width: 100%;
+      }
+      /* Make next/back row wrap nicely on small screens */
+      .transaction-nav {
+        flex-wrap: wrap;
+      }
+      .transaction-nav > * {
+        margin-bottom: 0.5rem;
+      }
+      @media (max-width: 576px) {
+        .transaction-nav button {
+          width: 48%;
+          margin-bottom: 0.5rem;
+        }
+      }
+      /* Markdown rendering in the response container */
+      .markdown-body {
+        font-family: sans-serif;
+        line-height: 1.4;
+      }
+      /* Simple toolbar for user query.
+         If you want additional styling for it, add here.
+       */
+      #markdown-toolbar button {
+        margin-right: 5px;
       }
     </style>
   </head>
@@ -152,7 +160,7 @@
       "
     >
       <div class="container">
-        <a class="navbar-brand text-white fw-bold" href="#">LLM Playground</a>
+        <a class="navbar-brand text-white fw-bold" href="#">Umisource</a>
       </div>
     </nav>
 
@@ -211,7 +219,7 @@
       </ul>
 
       <div class="tab-content" id="mainTabContent">
-        <!-- HOME TAB (Inference) -->
+        <!-- HOME TAB -->
         <div
           class="tab-pane fade show active"
           id="home"
@@ -221,34 +229,50 @@
           <div class="row justify-content-center g-4 mt-3">
             <div class="col-md-8">
               <div class="card border-0 shadow-sm">
-                <!-- Updated card-header layout -->
                 <div class="card-header bg-white">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <!-- Left: "Current Activity ID" label (bold) and the ID -->
-                    <div>
-                      <span class="me-2 fw-bold">Current Activity ID:</span>
-                      <span id="currentActivityLabel"></span>
+                  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                    <div class="mb-2 mb-md-0">
+                      <span class="fw-bold">Current Transaction:</span>
+                      <span id="currentTransactionLabel" class="ms-2"></span>
+                      <br><small id="currentOidLabel"></small>
                     </div>
-                    <!-- Right: Activity controls (Enter ID, refresh, load, back/next) -->
-                    <div class="d-flex align-items-center">
+                    <!-- Buttons row -->
+                    <div class="d-flex gap-2 flex-wrap transaction-nav">
+                      <button
+                        id="newTransactionBtn"
+                        class="btn btn-success btn-sm"
+                      >
+                        New
+                      </button>
+                      <button
+                        id="cancelTransactionBtn"
+                        class="btn btn-outline-danger btn-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        id="showHistoryBtn"
+                        class="btn btn-secondary btn-sm"
+                      >
+                        Show History
+                      </button>
                       <input
                         type="text"
-                        id="loadActivityInput"
+                        id="loadTransactionInput"
                         class="form-control form-control-sm me-2"
-                        placeholder="Enter Activity ID"
+                        placeholder="Transaction ID"
                         style="width: 150px;"
                       />
-                      <!-- Icon button for refresh (no text) -->
-                      <button
-                        id="refreshActivityBtn"
-                        class="btn btn-light btn-sm me-2"
-                      >
-                        <i class="bi bi-arrow-clockwise"></i>
-                      </button>
-                      <button id="loadActivityBtn" class="btn btn-secondary btn-sm me-2">
+                      <!-- If multiple found, show dropdown -->
+                      <select
+                        id="multipleTransactionsSelect"
+                        class="form-select form-select-sm"
+                        style="display: none; width: 180px;"
+                      ></select>
+                      <button id="loadTransactionBtn" class="btn btn-secondary btn-sm">
                         Load
                       </button>
-                      <button id="backBtn" class="btn btn-outline-secondary btn-sm me-2">
+                      <button id="backBtn" class="btn btn-outline-secondary btn-sm">
                         Back
                       </button>
                       <button id="nextBtn" class="btn btn-outline-secondary btn-sm">
@@ -259,17 +283,24 @@
                 </div>
                 <!-- card-body -->
                 <div class="card-body">
-                  <!-- 1) Model Response: text -->
-                  <div
-                    id="response-container"
-                    class="mb-3"
-                    style="display: none"
-                  >
-                    <h6>Model Response</h6>
-                    <div class="alert alert-secondary" id="response"></div>
+                  <!-- 1) System Prompt -->
+                  <div class="mb-3">
+                    <label for="system-prompt" class="form-label">System Prompt (Optional)</label>
+                    <textarea
+                      class="form-control"
+                      id="system-prompt"
+                      rows="2"
+                    ></textarea>
                   </div>
 
-                  <!-- 2) Model Response: audio -->
+                  <!-- 2) Model Response (Markdown or text) -->
+                  <div id="response-container" class="mb-3" style="display: none">
+                    <h6>Model Response</h6>
+                    <!-- We'll parse markdown into HTML here, so let's wrap it in .markdown-body -->
+                    <div class="border p-2 markdown-body" id="response" style="white-space: pre-wrap;"></div>
+                  </div>
+
+                  <!-- 3) Audio response controls -->
                   <div class="mb-3" id="responseAudioSection" style="display: none">
                     <button id="playResponseTTSBtn" class="btn speaker-btn">
                       <i class="bi bi-volume-up"></i> Generate Audio
@@ -303,13 +334,10 @@
                     </div>
                   </div>
 
-                  <!-- 3) Model Transcript: txt (Whisper transcription) -->
-                  <div
-                    id="whisper-container"
-                    class="mb-3"
-                    style="display: none"
-                  >
+                  <!-- 4) Whisper Transcription -->
+                  <div id="whisper-container" class="mb-3" style="display: none">
                     <h6>Whisper Transcription</h6>
+                    <!-- We'll hide text in chat, but here user can see it before re-submitting? (Ok) -->
                     <textarea
                       class="form-control"
                       id="whisper-transcription-editable"
@@ -317,7 +345,7 @@
                     ></textarea>
                   </div>
 
-                  <!-- 4) Model Transcript: audio (the TTS of the whisper text) -->
+                  <!-- 5) Whisper TTS audio controls -->
                   <div class="mb-3" id="whisperAudioSection" style="display: none">
                     <button id="playWhisperTTSBtn" class="btn speaker-btn">
                       <i class="bi bi-volume-up"></i> Generate Audio
@@ -348,8 +376,12 @@
                     </div>
                   </div>
 
-                  <!-- 5) Submit for Inference (whisper) -->
-                  <div class="mb-3" id="whisperInferenceSection" style="display: none">
+                  <!-- 6) Submit Whisper text for inference -->
+                  <div
+                    class="mb-3"
+                    id="whisperInferenceSection"
+                    style="display: none"
+                  >
                     <button
                       id="whisperInferenceBtn"
                       class="btn btn-primary w-100"
@@ -358,13 +390,20 @@
                     </button>
                   </div>
 
-                  <!-- 6) Select model -->
+                  <!-- A small toolbar for #query (markdown shortcuts) -->
+                  <div class="mb-2" id="markdown-toolbar">
+                    <button class="btn btn-sm btn-light" id="mdBoldBtn"><b>B</b></button>
+                    <button class="btn btn-sm btn-light" id="mdItalicBtn"><i>I</i></button>
+                    <button class="btn btn-sm btn-light" id="mdUnderlineBtn"><u>U</u></button>
+                    <button class="btn btn-sm btn-light" id="mdCodeBtn"><code>{}</code></button>
+                  </div>
+
+                  <!-- 7) Model Selection -->
                   <div class="mb-3">
                     <label for="model" class="form-label">Select Model</label>
                     <select
                       class="form-select"
                       id="model"
-                      name="model"
                       required
                     >
                       <option value="" disabled selected>
@@ -373,18 +412,17 @@
                     </select>
                   </div>
 
-                  <!-- 7) User query: txt -->
+                  <!-- 8) User Query -->
                   <div class="mb-3">
-                    <label for="query" class="form-label">User Query</label>
+                    <label for="query" class="form-label">User Query (Markdown or text)</label>
                     <textarea
                       class="form-control"
                       id="query"
-                      name="query"
                       rows="3"
                     ></textarea>
                   </div>
 
-                  <!-- 8) Submit button (user query) -->
+                  <!-- 9) Submit Query Button -->
                   <div class="mb-3">
                     <button
                       class="btn btn-primary w-100"
@@ -394,7 +432,7 @@
                     </button>
                   </div>
 
-                  <!-- 9) user input: audio (record button) -->
+                  <!-- 10) Microphone Recording -->
                   <div class="text-center">
                     <button id="startRecordingBtn" class="btn mic-btn">
                       <i class="bi bi-mic"></i> Record
@@ -410,7 +448,6 @@
                     >
                       Recording...
                     </p>
-                    <!-- Timer element -->
                     <p
                       id="record-timer"
                       style="font-size: 1.2rem; margin-bottom: 1rem"
@@ -772,8 +809,30 @@
 
     <!-- Footer -->
     <footer>
-      <small>&copy; 2025 - LLM Playground (Single Page)</small>
+      <small>&copy; 2025 - Umisource (Single Page)</small>
     </footer>
+
+    <!-- Chat History Modal -->
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Full Chat History</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <ul id="historyList" class="list-group">
+              <!-- Chat history messages appended here -->
+            </ul>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- JS: jQuery + Bootstrap Bundle + Our scripts -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -781,18 +840,18 @@
 
     <script>
       /********************************************
-       *       GLOBAL STATE + HELPER FUNCS        *
+       *        GLOBAL STATE + HELPER FUNCS       *
        ********************************************/
-      let currentActivityId = null;
-      let activityRecords = []; // All records in this activity
-      let currentRecordIndex = -1; // Which record is being displayed
-
+      let currentOid = null;
+      let currentTransactionId = null;
+      let chatHistory = [];
+      let currentChatIndex = -1;
       let mediaRecorder;
       let audioChunks = [];
       let recordInterval;
       let recordStartTime;
+      let mediaStream; // stop mic
 
-      // Format time helper
       function formatTime(seconds) {
         if (!seconds || isNaN(seconds)) {
           return "00:00";
@@ -804,13 +863,36 @@
         );
       }
 
+      // Marked config
+      marked.setOptions({
+        mangle: false,
+        headerIds: false,
+        breaks: true
+      });
+      function showModelResponse(mdContent) {
+        const html = marked.parse(mdContent || "");
+        document.getElementById("response").innerHTML = html;
+      }
+
+      // Insert markdown syntax for #query
+      function insertMarkdownSyntax(left, right='') {
+        const ta = document.getElementById("query");
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const text = ta.value;
+        const before = text.substring(0, start);
+        const sel = text.substring(start, end);
+        const after = text.substring(end);
+        ta.value = before + left + sel + right + after;
+        // move cursor
+        ta.selectionStart = ta.selectionEnd = end + left.length + right.length;
+        ta.focus();
+      }
+
       /********************************************
        *         ON DOCUMENT READY               *
        ********************************************/
       $(document).ready(function () {
-        // Always start a new activity on page load
-        createNewActivity();
-
         // SHIFT+ENTER => new line, ENTER => submit in #query
         $("#query").keydown(function (e) {
           if (e.keyCode === 13 && !e.shiftKey) {
@@ -826,38 +908,48 @@
           }
         });
 
+        // Markdown toolbar
+        $("#mdBoldBtn").click(()=>{insertMarkdownSyntax("**","**");});
+        $("#mdItalicBtn").click(()=>{insertMarkdownSyntax("_","_");});
+        $("#mdUnderlineBtn").click(()=>{insertMarkdownSyntax("<u>","</u>");});
+        $("#mdCodeBtn").click(()=>{insertMarkdownSyntax("`","`");});
+
         // Load model list
         loadModelsForDropdown("#model");
         loadModelsForDropdown("#delete_model_name");
         loadModelsForDropdown("#code_model_name");
 
-        // Refresh => new activity
-        $("#refreshActivityBtn").click(function () {
-          createNewActivity();
+        $("#newTransactionBtn").click(function () {
+          createNewTransaction();
+        });
+        $("#cancelTransactionBtn").click(function () {
+          cancelTransaction();
+        });
+        $("#showHistoryBtn").click(function () {
+          showFullHistoryModal();
+        });
+        $("#loadTransactionBtn").click(function () {
+          attemptLoadTransaction();
+        });
+        $("#multipleTransactionsSelect").change(function(){
+          const chosenOid = $(this).val();
+          if (!chosenOid) return;
+          loadTransactionByOid(chosenOid);
         });
 
-        // Load => fetch existing activity by ID
-        $("#loadActivityBtn").click(function () {
-          const inputId = $("#loadActivityInput").val().trim();
-          if (!inputId) return;
-          currentActivityId = inputId;
-          $("#currentActivityLabel").text(currentActivityId);
-          fetchActivityRecords(); // fetch & display from DB
-        });
-
-        // Back/Next buttons
+        // Back/Next
         $("#backBtn").click(function () {
-          if (activityRecords.length === 0) return;
-          if (currentRecordIndex > 0) {
-            currentRecordIndex--;
-            displayRecord(activityRecords[currentRecordIndex]);
+          if (chatHistory.length === 0) return;
+          if (currentChatIndex > 0) {
+            currentChatIndex--;
+            displayChatMessage(chatHistory[currentChatIndex]);
           }
         });
         $("#nextBtn").click(function () {
-          if (activityRecords.length === 0) return;
-          if (currentRecordIndex < activityRecords.length - 1) {
-            currentRecordIndex++;
-            displayRecord(activityRecords[currentRecordIndex]);
+          if (chatHistory.length === 0) return;
+          if (currentChatIndex < chatHistory.length - 1) {
+            currentChatIndex++;
+            displayChatMessage(chatHistory[currentChatIndex]);
           }
         });
 
@@ -865,60 +957,18 @@
         $("#submitQueryBtn").click(function () {
           submitTextQuery();
         });
-
-        // Submit whisper text for inference
+        // Submit whisper text
         $("#whisperInferenceBtn").click(function () {
-          const input_text = $("#whisper-transcription-editable").val().trim();
-          const model = $("#model").val();
-          if (!model) {
-            alert("Please select a model first.");
+          const text = $("#whisper-transcription-editable").val().trim();
+          if (!text) {
+            alert("No transcription text to infer.");
             return;
           }
-          if (!input_text) {
-            alert("No text to infer. Please transcribe or type something.");
-            return;
-          }
-          resetModelTtsUI();
-          resetWhisperTtsUI();
-
-          $("#loader").show();
-          $("#response-container").hide();
-
-          $.post(
-            "/api/query",
-            {
-              model: model,
-              query: input_text,
-              activity_id: currentActivityId
-            },
-            function (data) {
-              $("#loader").hide();
-              if (data.response) {
-                // Fill the UI with the new model response
-                $("#response").text(data.response);
-                $("#response-container").show();
-                $("#responseAudioSection").show(); // let user generate audio
-                // Now refetch the entire activity so it's in our history
-                fetchActivityRecords(true);
-              } else {
-                $("#response").text("Error: " + data.error);
-                $("#response-container").show();
-                $("#responseAudioSection").hide();
-              }
-            }
-          ).fail(function (xhr) {
-            $("#loader").hide();
-            $("#response").text(
-              "Error: " + (xhr.responseJSON?.error || xhr.statusText)
-            );
-            $("#response-container").show();
-            $("#responseAudioSection").hide();
-          });
+          queryWithWhisperText(text);
         });
 
-        // Start recording (mic)
+        // Start recording
         $("#startRecordingBtn").click(async function () {
-          // Hide old sections
           $("#response-container").hide();
           $("#responseAudioSection").hide();
           $("#whisper-container").hide();
@@ -929,30 +979,22 @@
           resetModelTtsUI();
           resetWhisperTtsUI();
 
-          // Determine a mimeType that is supported
           let mimeType = "";
-          const possibleTypes = [
-            "audio/webm; codecs=opus",
-            "audio/mp4",
-          ];
+          const possibleTypes = ["audio/webm; codecs=opus", "audio/mp4"];
           for (const t of possibleTypes) {
             if (MediaRecorder.isTypeSupported(t)) {
               mimeType = t;
               break;
             }
           }
-          // If none found, let the browser pick
+
           try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-              audio: true
-            });
-
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             if (mimeType) {
-              mediaRecorder = new MediaRecorder(stream, { mimeType });
+              mediaRecorder = new MediaRecorder(mediaStream, { mimeType });
             } else {
-              mediaRecorder = new MediaRecorder(stream);
+              mediaRecorder = new MediaRecorder(mediaStream);
             }
-
             mediaRecorder.onstart = function () {
               $("#recordingUI").removeClass("hidden");
               $("#recordingIndicator").show();
@@ -966,11 +1008,7 @@
             mediaRecorder.start();
           } catch (err) {
             $("#recordingUI").addClass("hidden");
-            $("#response").text(
-              "Error: Unable to start recording. " + err.message
-            );
-            $("#response-container").show();
-            $("#responseAudioSection").hide();
+            alert("Error: " + err.message);
             resetRecordingUI();
           }
         });
@@ -983,6 +1021,10 @@
           stopRecordingTimer();
           $("#recordingIndicator").hide();
           resetRecordingUI();
+          if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
+          }
         });
 
         // Confirm => send to /api/transcribe
@@ -996,20 +1038,21 @@
             $("#recordingIndicator").hide();
             $("#recordingUI").addClass("hidden");
 
-            // We'll decide extension based on what we used
-            // If we used "audio/mp4" => name it "recording.mp4"
-            // else => default "recording.webm"
-            let extension = ".webm";
-            if (mediaRecorder.mimeType.indexOf("mp4") !== -1) {
-              extension = ".mp4";
+            if (mediaStream) {
+              mediaStream.getTracks().forEach(track => track.stop());
+              mediaStream = null;
             }
 
+            let extension = ".webm";
+            if (mediaRecorder.mimeType && mediaRecorder.mimeType.indexOf("mp4") !== -1) {
+              extension = ".mp4";
+            }
             const blob = new Blob(audioChunks, {
               type: mediaRecorder.mimeType || "audio/webm"
             });
             const formData = new FormData();
             formData.append("audio_data", blob, "recording" + extension);
-            formData.append("activity_id", currentActivityId);
+            formData.append("_id", currentOid || "");
 
             $.ajax({
               url: "/api/transcribe",
@@ -1020,143 +1063,253 @@
               success: function (data) {
                 $("#loader").hide();
                 if (data.transcription) {
-                  // Show the new transcription
+                  reloadTransaction(currentOid);
                   $("#whisper-transcription-editable").val(data.transcription);
                   $("#whisper-container").show();
                   $("#whisperAudioSection").show();
                   $("#whisperInferenceSection").show();
                 } else if (data.error) {
-                  $("#response").text("Error: " + data.error);
-                  $("#response-container").show();
-                  $("#responseAudioSection").hide();
+                  alert("Error: " + data.error);
                 }
                 resetRecordingUI();
-                // fetch updates so this new step is in our activityRecords
-                fetchActivityRecords(true);
               },
               error: function (xhr) {
                 $("#loader").hide();
-                $("#response").text(
-                  "Error: " + (xhr.responseJSON?.error || xhr.statusText)
-                );
-                $("#response-container").show();
-                $("#responseAudioSection").hide();
+                alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
                 resetRecordingUI();
               },
             });
           };
         });
 
-        // Initialize TTS control logic
         initTTSControls();
       });
 
       /********************************************
-       *        CREATE / LOAD / FETCH ACTIVITY    *
+       *       TRANSACTION LOGIC                 *
        ********************************************/
-      function createNewActivity() {
-        $.get("/api/new_activity", function (data) {
-          currentActivityId = data.activity_id;
-          $("#currentActivityLabel").text(currentActivityId);
-          activityRecords = [];
-          currentRecordIndex = -1;
-        });
-      }
-
-      function loadModelsForDropdown(selector) {
-        $.get("/api/list_models", function (data) {
-          const sel = $(selector);
-          sel.empty();
-          sel.append(`<option value="" disabled selected>Select a model</option>`);
-          if (data.models && data.models.length) {
-            data.models.forEach((m) => {
-              sel.append(`<option value="${m}">${m}</option>`);
-            });
+      function createNewTransaction() {
+        $.post("/api/new_transaction", {}, function (data) {
+          if (data.record_id && data.transaction_id) {
+            currentOid = data._id;
+            currentTransactionId = data.transaction_id;
+            $("#currentTransactionLabel").text(currentTransactionId);
+            $("#currentOidLabel").text("(oid="+ currentOid + ")");
+            chatHistory = [];
+            currentChatIndex = -1;
+          } else {
+            alert("Error creating transaction: " + JSON.stringify(data));
           }
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
         });
       }
 
-      // Pull from DB so we can do back/next
-      function fetchActivityRecords(goToLast = false) {
-        if (!currentActivityId) return;
-        $.get("/api/get_activity?activity_id=" + currentActivityId, (data) => {
-          if (data.records) {
-            activityRecords = data.records;
-            if (activityRecords.length) {
-              if (goToLast) {
-                currentRecordIndex = activityRecords.length - 1;
-              } else {
-                if (currentRecordIndex < 0) {
-                  currentRecordIndex = 0;
-                }
-              }
-              displayRecord(activityRecords[currentRecordIndex]);
+      function cancelTransaction() {
+        if (!currentOid) {
+          alert("No transaction to cancel.");
+          return;
+        }
+        $.post("/api/cancel_transaction", { _id: currentOid }, function (data) {
+          if (data.status === "deleted") {
+            alert("Transaction deleted. Please create a new one.");
+            currentOid = null;
+            currentTransactionId = null;
+            $("#currentTransactionLabel").text("");
+            $("#currentOidLabel").text("");
+            chatHistory = [];
+            currentChatIndex = -1;
+          } else if (data.status === "canceled") {
+            alert("Transaction canceled (marked as canceled).");
+          }
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      }
+
+      function attemptLoadTransaction() {
+        const userTid = $("#loadTransactionInput").val().trim();
+        if (!userTid) {
+          alert("Please enter a transaction ID to load.");
+          return;
+        }
+        $.get("/api/find_transactions_by_tid?transaction_id=" + userTid, function (data) {
+          if (data.error) {
+            alert("Error: " + data.error);
+            return;
+          }
+          const arr = data.results || [];
+          if (arr.length === 0) {
+            alert("No transaction(s) found for " + userTid);
+          } else if (arr.length === 1) {
+            const single = arr[0];
+            loadTransactionByOid(single._id);
+          } else {
+            const sel = $("#multipleTransactionsSelect");
+            sel.empty();
+            sel.append(`<option value="">Select one...</option>`);
+            arr.forEach(doc => {
+              const label = doc._id + " (created " + doc.created_at + ")";
+              sel.append(`<option value="${doc._id}">${label}</option>`);
+            });
+            sel.show();
+          }
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      }
+
+      function loadTransactionByOid(oid) {
+        if (!oid) return;
+        $.get("/api/load_transaction?_id=" + oid, function (data) {
+          if (data.error) {
+            alert("Error: " + data.error);
+          } else {
+            currentOid = data._id;
+            currentTransactionId = data.transaction_id;
+            $("#currentTransactionLabel").text(currentTransactionId);
+            $("#currentOidLabel").text("(oid="+ currentOid + ")");
+            chatHistory = data.chat_history || [];
+            if (chatHistory.length) {
+              currentChatIndex = chatHistory.length - 1;
+              displayChatMessage(chatHistory[currentChatIndex]);
+            } else {
+              currentChatIndex = -1;
+            }
+            $("#multipleTransactionsSelect").hide();
+          }
+        }).fail(function (xhr) {
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      }
+
+      function reloadTransaction(oid) {
+        if (!oid) return;
+        $.get("/api/load_transaction?_id=" + oid, function (data) {
+          if (!data.error) {
+            chatHistory = data.chat_history || [];
+            if (chatHistory.length) {
+              currentChatIndex = chatHistory.length - 1;
+              displayChatMessage(chatHistory[currentChatIndex]);
+            } else {
+              currentChatIndex = -1;
             }
           }
         });
       }
 
-      /********************************************
-       *         DISPLAY / NAVIGATE RECORDS       *
-       ********************************************/
-      function displayRecord(record) {
-        // Clear TTS UIs
-        resetModelTtsUI();
-        resetWhisperTtsUI();
-
-        const type = record.interaction_type;
-
-        if (type === "text-to-text") {
-          $("#query").val(record.input_data || "");
-          $("#response").text(record.output_data || "");
-          $("#response-container").show();
-
-          // Show "Generate Audio" button if there's something to speak
-          if (record.output_data && record.output_data.trim()) {
-            $("#responseAudioSection").show();
-          } else {
-            $("#responseAudioSection").hide();
+      function showFullHistoryModal() {
+        if (!currentOid) {
+          alert("No transaction loaded.");
+          return;
+        }
+        $.get("/api/get_chat_history?_id=" + currentOid, function (data) {
+          if (data.error) {
+            alert("Error: " + data.error);
+            return;
           }
+          const list = data.chat_history || [];
+          const $historyList = $("#historyList");
+          $historyList.empty();
+          list.forEach((msg) => {
+            let display = `[${msg.role}]`;
+            if (msg.interaction_type === "text-to-speech" || msg.interaction_type === "speech-to-text") {
+              display += " (AUDIO ONLY)";
+            } else {
+              display += " " + (msg.content || "");
+            }
+            const li = document.createElement("li");
+            li.className = "list-group-item";
+            li.textContent = display;
+            $historyList.append(li);
+          });
+          const historyModal = new bootstrap.Modal(document.getElementById("historyModal"));
+          historyModal.show();
+        });
+      }
 
-          // Hide whisper parts
+      /********************************************
+       *         CHAT DISPLAY FOR CURRENT MSG     *
+       ********************************************/
+      function displayChatMessage(msg) {
+        if (!msg) {
+          $("#response-container").hide();
           $("#whisper-container").hide();
-          $("#whisperAudioSection").hide();
-          $("#whisperInferenceSection").hide();
-
-        } else if (type === "speech-to-text") {
-          $("#whisper-transcription-editable").val(record.output_data || "");
+          $("#query").val("");
+          return;
+        }
+        const itype = msg.interaction_type;
+        if (itype === "speech-to-text") {
+          $("#whisper-transcription-editable").val(msg.content || "");
           $("#whisper-container").show();
           $("#whisperAudioSection").show();
           $("#whisperInferenceSection").show();
-
-          // Hide normal response
           $("#response-container").hide();
           $("#responseAudioSection").hide();
-
-        } else if (type === "text-to-speech") {
-          // Typically we do not directly display text-to-speech records here
+          $("#query").val("");
+        }
+        else if (itype === "text-to-speech") {
+          $("#whisper-container").hide();
+          $("#whisperAudioSection").hide();
+          $("#whisperInferenceSection").hide();
+          $("#response-container").hide();
+          $("#responseAudioSection").hide();
+          $("#query").val("");
+        }
+        else if (itype === "text-to-text") {
+          if (msg.role === "user") {
+            // restore input text
+            $("#query").val(msg.content || "");
+            $("#response-container").hide();
+            $("#responseAudioSection").hide();
+            $("#whisper-container").hide();
+            $("#whisperAudioSection").hide();
+            $("#whisperInferenceSection").hide();
+          } else {
+            // model response => parse as markdown
+            showModelResponse(msg.content || "");
+            $("#response-container").show();
+            $("#responseAudioSection").show();
+            $("#whisper-container").hide();
+            $("#whisperAudioSection").hide();
+            $("#whisperInferenceSection").hide();
+            $("#query").val("");
+          }
+        }
+        else if (msg.role === "system") {
           $("#response-container").hide();
           $("#responseAudioSection").hide();
           $("#whisper-container").hide();
           $("#whisperAudioSection").hide();
           $("#whisperInferenceSection").hide();
+          $("#query").val("");
+        }
+        else {
+          $("#response-container").hide();
+          $("#whisper-container").hide();
+          $("#query").val("");
         }
       }
 
       /********************************************
-       *             SUBMIT USER QUERY            *
+       *               INFERENCE                  *
        ********************************************/
       function submitTextQuery() {
-        const model = $("#model").val();
-        const input_text = $("#query").val().trim();
-        if (!model) {
-          alert("Please select a model first.");
+        if (!currentOid) {
+          alert("No transaction to submit to. Create or load one first.");
           return;
         }
-        if (!input_text) {
+        const model = $("#model").val();
+        if (!model) {
+          alert("Please select a model.");
+          return;
+        }
+        const userPrompt = $("#query").val().trim();
+        if (!userPrompt) {
           alert("No text provided.");
           return;
         }
+        const systemPrompt = $("#system-prompt").val().trim();
         resetModelTtsUI();
         resetWhisperTtsUI();
 
@@ -1164,37 +1317,66 @@
         $("#response-container").hide();
         $("#responseAudioSection").hide();
 
-        $.post("/api/query",
-          {
-            model: model,
-            query: input_text,
-            activity_id: currentActivityId
-          },
-          function (data) {
-            $("#loader").hide();
-            if (data.response) {
-              $("#response").text(data.response);
-              $("#response-container").show();
-              $("#responseAudioSection").show();
-              fetchActivityRecords(true);
-            } else {
-              $("#response").text("Error: " + data.error);
-              $("#response-container").show();
-              $("#responseAudioSection").hide();
-            }
-          }
-        ).fail(function (xhr) {
+        $.post("/api/query", {
+          model: model,
+          query: userPrompt,
+          _id: currentOid,
+          system_prompt: systemPrompt
+        }, function (data) {
           $("#loader").hide();
-          $("#response").text(
-            "Error: " + (xhr.responseJSON?.error || xhr.statusText)
-          );
-          $("#response-container").show();
-          $("#responseAudioSection").hide();
+          if (data.response) {
+            reloadTransaction(currentOid);
+            showModelResponse(data.response);
+            $("#response-container").show();
+            $("#responseAudioSection").show();
+          } else if (data.error) {
+            alert("Error: " + data.error);
+          }
+        }).fail(function (xhr) {
+          $("#loader").hide();
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
+        });
+      }
+
+      function queryWithWhisperText(text) {
+        if (!currentOid) {
+          alert("No transaction to submit to. Create or load one first.");
+          return;
+        }
+        const model = $("#model").val();
+        if (!model) {
+          alert("Please select a model.");
+          return;
+        }
+        const systemPrompt = $("#system-prompt").val().trim();
+        resetModelTtsUI();
+        resetWhisperTtsUI();
+        $("#loader").show();
+        $("#response-container").hide();
+
+        $.post("/api/query", {
+          model: model,
+          query: text,
+          _id: currentOid,
+          system_prompt: systemPrompt
+        }, function (data) {
+          $("#loader").hide();
+          if (data.response) {
+            reloadTransaction(currentOid);
+            showModelResponse(data.response);
+            $("#response-container").show();
+            $("#responseAudioSection").show();
+          } else if (data.error) {
+            alert("Error: " + data.error);
+          }
+        }).fail(function (xhr) {
+          $("#loader").hide();
+          alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
         });
       }
 
       /********************************************
-       *              RECORDING TIMER             *
+       *           RECORDING UTILS               *
        ********************************************/
       function startRecordingTimer() {
         recordStartTime = Date.now();
@@ -1214,7 +1396,7 @@
       }
 
       /********************************************
-       *         TEXT-TO-SPEECH CONTROLS          *
+       *         TEXT-TO-SPEECH CONTROLS         *
        ********************************************/
       function initTTSControls() {
         // Model TTS
@@ -1225,32 +1407,29 @@
         const responseAudioTime = document.getElementById("responseAudioTime");
 
         $("#playResponseTTSBtn").click(function () {
+          if (!currentOid) {
+            alert("No transaction loaded.");
+            return;
+          }
           resetModelTtsUI();
           const text = $("#response").text().trim();
           if (!text) return;
-          const speaker = $("#modelTtsSpeakerSelect").val();
-          const speed = $("#modelTtsSpeedRange").val();
-
-          $.post(
-            "/api/tts",
-            {
-              text: text,
-              speaker: speaker,
-              speed: speed,
-              activity_id: currentActivityId
-            },
-            function (data) {
-              if (data.audio) {
-                responseAudioControls.style.display = "flex";
-                responseAudio.style.display = "none";
-                responseAudio.src = "data:audio/wav;base64," + data.audio;
-                responseAudio.load();
-                responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-                responseAudioProgress.value = 0;
-                responseAudioTime.textContent = "00:00 / 00:00";
-              }
+          $.post("/api/tts", {
+            text: text,
+            speaker: $("#modelTtsSpeakerSelect").val(),
+            speed: $("#modelTtsSpeedRange").val(),
+            _id: currentOid
+          }, function (data) {
+            if (data.audio) {
+              responseAudioControls.style.display = "flex";
+              responseAudio.style.display = "none";
+              responseAudio.src = "data:audio/wav;base64," + data.audio;
+              responseAudio.load();
+              responsePlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+              responseAudioProgress.value = 0;
+              responseAudioTime.textContent = "00:00 / 00:00";
             }
-          ).fail(function (xhr) {
+          }).fail(function (xhr) {
             alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
           });
         });
@@ -1294,32 +1473,29 @@
         const whisperAudioTime = document.getElementById("whisperAudioTime");
 
         $("#playWhisperTTSBtn").click(function () {
+          if (!currentOid) {
+            alert("No transaction loaded.");
+            return;
+          }
           resetWhisperTtsUI();
           const text = $("#whisper-transcription-editable").val().trim();
           if (!text) return;
-          const speaker = $("#whisperTtsSpeakerSelect").val();
-          const speed = $("#whisperTtsSpeedRange").val();
-
-          $.post(
-            "/api/tts",
-            {
-              text: text,
-              speaker: speaker,
-              speed: speed,
-              activity_id: currentActivityId
-            },
-            function (data) {
-              if (data.audio) {
-                whisperAudioControls.style.display = "flex";
-                whisperAudio.classList.remove("hidden");
-                whisperAudio.src = "data:audio/wav;base64," + data.audio;
-                whisperAudio.load();
-                whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
-                whisperAudioProgress.value = 0;
-                whisperAudioTime.textContent = "00:00 / 00:00";
-              }
+          $.post("/api/tts", {
+            text: text,
+            speaker: $("#whisperTtsSpeakerSelect").val(),
+            speed: $("#whisperTtsSpeedRange").val(),
+            _id: currentOid
+          }, function (data) {
+            if (data.audio) {
+              whisperAudioControls.style.display = "flex";
+              whisperAudio.classList.remove("hidden");
+              whisperAudio.src = "data:audio/wav;base64," + data.audio;
+              whisperAudio.load();
+              whisperPlayPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+              whisperAudioProgress.value = 0;
+              whisperAudioTime.textContent = "00:00 / 00:00";
             }
-          ).fail(function (xhr) {
+          }).fail(function (xhr) {
             alert("Error: " + (xhr.responseJSON?.error || xhr.statusText));
           });
         });
@@ -1386,7 +1562,7 @@
       }
 
       /********************************************
-       *          MANAGE MODELS & SERVER          *
+       *       MANAGE MODELS & SERVER            *
        ********************************************/
       // Add Model
       $("#add-model-form").on("submit", function (e) {
@@ -1497,6 +1673,19 @@
           $("#server-logs-box").text(errMsg).show();
         });
       });
+
+      function loadModelsForDropdown(selector) {
+        $.get("/api/list_models", function (data) {
+          const sel = $(selector);
+          sel.empty();
+          sel.append(`<option value="" disabled selected>Select a model</option>`);
+          if (data.models && data.models.length) {
+            data.models.forEach((m) => {
+              sel.append(`<option value="${m}">${m}</option>`);
+            });
+          }
+        });
+      }
     </script>
   </body>
 </html>

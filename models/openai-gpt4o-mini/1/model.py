@@ -1,12 +1,11 @@
 """
 model.py for openai:gpt-4o-mini using aisuite.
-
-This Python backend relay uses aisuite to connect to the model: openai:gpt-4o-mini
 """
 import triton_python_backend_utils as pb_utils
 import aisuite as ai
 import numpy as np
 import logging
+import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,21 +27,39 @@ class TritonPythonModel:
                 raise ValueError("Input tensor 'INPUT' is missing.")
             input_array = input_tensor.as_numpy()
 
+            # Expect shape [1,1] or [1]
             if len(input_array.shape) == 1:
-                user_cmd = input_array[0]
-            elif len(input_array.shape) == 2:
-                user_cmd = input_array[0, 0]
+                raw_data = input_array[0]
             else:
-                raise ValueError(f"Unexpected shape {input_array.shape}")
+                raw_data = input_array[0, 0]
 
-            if isinstance(user_cmd, bytes):
-                user_cmd = user_cmd.decode("utf-8")
-            logger.info(f"User command: {user_cmd}")
+            if isinstance(raw_data, bytes):
+                raw_data = raw_data.decode("utf-8")
 
-            messages = [
-                {"role": "system", "content": "You are a helpful AI assistant."},
-                {"role": "user", "content": user_cmd}
-            ]
+            # Attempt to parse as JSON
+            # If it fails, assume it's a single string prompt (grammar correction).
+            messages = []
+            try:
+                chat_obj = json.loads(raw_data)
+                if isinstance(chat_obj, list):
+                    # We have a list of messages
+                    messages = chat_obj
+                    # Ensure there's at least a system + user
+                    # We'll just pass as is
+                else:
+                    # If it's not a list, treat it as plain text
+                    messages = [{"role": "user", "content": str(chat_obj)}]
+            except:
+                # raw_data is just a single string
+                messages = [{"role": "user", "content": raw_data}]
+
+            # If we do not see a system in messages, we can prepend a default
+            has_system = any(m.get("role") == "system" for m in messages)
+            if not has_system:
+                messages.insert(0, {"role": "system", "content": "You are a helpful AI"})
+
+            logger.info(f"User command: {raw_data}")
+            logger.info(f"Passing messages: {messages}")
 
             for model in self.models:
                 response = self.client.chat.completions.create(
